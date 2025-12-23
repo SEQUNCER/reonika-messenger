@@ -18,6 +18,7 @@ class MobileREonikaEnhancements {
         this.addSwipeGestures();
         this.fixMessageScrolling();
         this.addMessageBottomPadding();
+        this.fixKeyboardIssues();
     }
     
     addMobileBackButton() {
@@ -28,11 +29,12 @@ class MobileREonikaEnhancements {
                 backButton.id = 'mobile-back-button';
                 backButton.className = 'mobile-back-button';
                 backButton.innerHTML = '<i class="fas fa-arrow-left"></i>';
-                backButton.title = 'Вернуться к чатам';
+                backButton.title = 'Назад к чатам';
                 
                 chatHeader.insertBefore(backButton, chatHeader.firstChild);
                 
-                backButton.addEventListener('click', () => {
+                backButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     this.closeMobileChat();
                 });
             }
@@ -44,24 +46,40 @@ class MobileREonikaEnhancements {
     closeMobileChat() {
         if (this.messenger.isMobile && this.messenger.currentChat) {
             const chatArea = document.getElementById('chat-area');
+            const sidebar = document.querySelector('.sidebar');
+            
             if (chatArea) {
                 chatArea.classList.remove('chat-active');
             }
             
+            if (sidebar) {
+                sidebar.style.display = 'block';
+            }
+            
             this.messenger.currentChat = null;
             this.messenger.updateChatUI();
-            this.showChatsList();
+            
+            // Скрываем интерфейс чата
+            const chatHeader = document.getElementById('chat-header');
+            const chatInputContainer = document.getElementById('chat-input-container');
+            const noChatSelected = document.querySelector('.no-chat-selected');
+            const messagesContainer = document.getElementById('messages-container');
+            
+            if (chatHeader) chatHeader.style.display = 'none';
+            if (chatInputContainer) chatInputContainer.style.display = 'none';
+            if (noChatSelected) noChatSelected.style.display = 'flex';
+            if (messagesContainer) messagesContainer.innerHTML = `
+                <div class="no-chat-selected">
+                    <i class="fas fa-comments"></i>
+                    <p>Выберите чат для начала общения</p>
+                </div>
+            `;
+            
+            this.messenger.showNotification('Вернулись к списку чатов', 'info');
             
             setTimeout(() => {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }, 100);
-        }
-    }
-    
-    showChatsList() {
-        const sidebar = document.querySelector('.sidebar');
-        if (sidebar) {
-            sidebar.style.display = 'block';
         }
     }
     
@@ -91,9 +109,12 @@ class MobileREonikaEnhancements {
                 
                 if (messageInput) {
                     messageInput.disabled = false;
-                    setTimeout(() => {
-                        messageInput.focus();
-                    }, 100);
+                    // НЕ фокусируем автоматически на мобильных
+                    if (!this.isMobile) {
+                        setTimeout(() => {
+                            messageInput.focus();
+                        }, 100);
+                    }
                 }
                 if (sendBtn) sendBtn.disabled = false;
                 
@@ -101,12 +122,18 @@ class MobileREonikaEnhancements {
                 const chatInputContainer = document.getElementById('chat-input-container');
                 const noChatSelected = document.querySelector('.no-chat-selected');
                 const chatArea = document.getElementById('chat-area');
+                const sidebar = document.querySelector('.sidebar');
                 
                 if (chatHeader) chatHeader.style.display = 'flex';
                 if (chatInputContainer) chatInputContainer.style.display = 'flex';
                 if (noChatSelected) noChatSelected.style.display = 'none';
-                if (this.isMobile && chatArea) {
-                    chatArea.classList.add('chat-active');
+                if (this.isMobile) {
+                    if (chatArea) {
+                        chatArea.classList.add('chat-active');
+                    }
+                    if (sidebar) {
+                        sidebar.style.display = 'none';
+                    }
                 }
                 
                 this.hideSearchResults();
@@ -154,13 +181,13 @@ class MobileREonikaEnhancements {
             style.id = styleId;
             style.textContent = `
                 .chat-messages {
-                    padding-bottom: 100px !important;
+                    padding-bottom: 120px !important;
                     box-sizing: border-box;
                 }
                 
                 @media (max-width: 768px) {
                     .chat-messages {
-                        padding-bottom: 120px !important;
+                        padding-bottom: 160px !important;
                     }
                 }
                 
@@ -200,22 +227,52 @@ class MobileREonikaEnhancements {
                     display: none !important;
                     align-items: center;
                     justify-content: center;
-                    width: 40px;
-                    height: 40px;
-                    background: var(--primary-gray);
-                    color: white;
-                    border: none;
+                    width: 44px;
+                    height: 44px;
+                    background: var(--primary-gray) !important;
+                    color: white !important;
+                    border: 2px solid rgba(255, 255, 255, 0.2) !important;
                     border-radius: 50%;
                     font-size: 18px;
                     cursor: pointer;
                     transition: all 0.3s;
                     margin-right: 12px;
                     flex-shrink: 0;
+                    z-index: 100;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+                    position: relative;
+                }
+                
+                .mobile-back-button::after {
+                    content: 'Назад к чатам';
+                    position: absolute;
+                    left: 50px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    background: rgba(0, 0, 0, 0.8);
+                    color: white;
+                    padding: 6px 10px;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    white-space: nowrap;
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 0.3s;
+                    z-index: 101;
+                }
+                
+                .mobile-back-button:hover::after {
+                    opacity: 1;
                 }
                 
                 .mobile-back-button:hover {
-                    background: var(--secondary-gray);
+                    background: var(--secondary-gray) !important;
                     transform: scale(1.05);
+                    border-color: rgba(255, 255, 255, 0.4) !important;
+                }
+                
+                .mobile-back-button:active {
+                    transform: scale(0.95);
                 }
                 
                 @media (max-width: 768px) {
@@ -225,6 +282,32 @@ class MobileREonikaEnhancements {
                     
                     .chat-header {
                         padding: 12px 16px;
+                        background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray)) !important;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                    }
+                    
+                    .chat-partner-info h2 {
+                        color: white !important;
+                        font-size: 18px;
+                    }
+                    
+                    .status {
+                        color: rgba(255, 255, 255, 0.8) !important;
+                        font-size: 13px;
+                    }
+                    
+                    .chat-partner-info .avatar {
+                        border-color: white !important;
+                    }
+                    
+                    #delete-chat-btn {
+                        color: white !important;
+                        opacity: 0.8;
+                    }
+                    
+                    #delete-chat-btn:hover {
+                        color: #ff6b6b !important;
+                        opacity: 1;
                     }
                     
                     .btn-primary, .btn-icon, .chat-item {
@@ -248,19 +331,59 @@ class MobileREonikaEnhancements {
                     .chat-messages {
                         -webkit-overflow-scrolling: touch;
                         overscroll-behavior: contain;
+                        padding-bottom: 180px !important;
+                    }
+                    
+                    /* Стили для скрытия сайдбара при открытом чате */
+                    .chat-area.chat-active ~ .sidebar {
+                        display: none !important;
+                    }
+                    
+                    /* Стили для отображения чата на весь экран */
+                    .chat-area {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        z-index: 1000;
+                        background: white;
+                        transform: translateX(100%);
+                        transition: transform 0.3s ease;
+                    }
+                    
+                    .chat-area.chat-active {
+                        transform: translateX(0);
+                    }
+                    
+                    /* Поле ввода фиксировано внизу */
+                    .chat-input-container {
+                        position: fixed;
+                        bottom: 0;
+                        left: 0;
+                        right: 0;
+                        background: white;
+                        border-top: 1px solid var(--lighter-gray);
+                        padding: 12px 16px;
+                        z-index: 1001;
+                        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
                     }
                 }
                 
                 @media (max-width: 360px) {
                     .mobile-back-button {
-                        width: 36px;
-                        height: 36px;
+                        width: 40px;
+                        height: 40px;
                         font-size: 16px;
                         margin-right: 8px;
                     }
                     
+                    .mobile-back-button::after {
+                        display: none;
+                    }
+                    
                     .chat-partner-info h2 {
-                        font-size: 18px;
+                        font-size: 16px;
                     }
                     
                     .chat-input-container {
@@ -268,7 +391,7 @@ class MobileREonikaEnhancements {
                     }
                     
                     .chat-messages {
-                        padding-bottom: 140px !important;
+                        padding-bottom: 180px !important;
                     }
                 }
             `;
@@ -393,6 +516,7 @@ class MobileREonikaEnhancements {
         this.optimizeTouchElements();
         this.preventZoomOnInput();
         this.adjustViewport();
+        this.fixInputScrolling();
     }
     
     optimizeTouchElements() {
@@ -425,6 +549,21 @@ class MobileREonikaEnhancements {
                     input, textarea {
                         font-size: 16px !important;
                     }
+                    
+                    /* Улучшаем отзывчивость кнопок */
+                    button, .btn-primary, .btn-icon {
+                        touch-action: manipulation;
+                    }
+                    
+                    /* Предотвращаем выделение текста при быстром тапе */
+                    * {
+                        -webkit-tap-highlight-color: transparent;
+                    }
+                    
+                    /* Улучшаем скроллинг */
+                    .chat-messages, .chats-list {
+                        scroll-behavior: smooth;
+                    }
                 }
             `;
             document.head.appendChild(style);
@@ -436,10 +575,39 @@ class MobileREonikaEnhancements {
             const inputs = document.querySelectorAll('input, textarea, select');
             inputs.forEach(input => {
                 input.addEventListener('focus', () => {
+                    // Предотвращаем автоматическое увеличение масштаба
                     setTimeout(() => {
-                        window.scrollTo(0, 0);
+                        document.body.style.zoom = "1.0";
                     }, 100);
                 });
+            });
+        }
+    }
+    
+    fixInputScrolling() {
+        if (!this.messenger.isMobile) return;
+        
+        const messageInput = document.getElementById('message-input');
+        if (messageInput) {
+            messageInput.addEventListener('focus', () => {
+                setTimeout(() => {
+                    // Прокручиваем так, чтобы поле ввода было видно
+                    const inputRect = messageInput.getBoundingClientRect();
+                    const viewportHeight = window.innerHeight;
+                    
+                    if (inputRect.bottom > viewportHeight - 200) {
+                        window.scrollTo({
+                            top: window.scrollY + (inputRect.bottom - viewportHeight + 250),
+                            behavior: 'smooth'
+                        });
+                    }
+                    
+                    // Также прокручиваем контейнер сообщений
+                    const messagesContainer = document.getElementById('messages-container');
+                    if (messagesContainer) {
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                }, 300);
             });
         }
     }
@@ -452,6 +620,49 @@ class MobileREonikaEnhancements {
                     'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
             }
         }
+    }
+    
+    fixKeyboardIssues() {
+        if (!this.messenger.isMobile) return;
+        
+        // Отслеживаем изменения высоты viewport (когда появляется/скрывается клавиатура)
+        let lastHeight = window.innerHeight;
+        
+        window.addEventListener('resize', () => {
+            const newHeight = window.innerHeight;
+            
+            // Если высота уменьшилась (появилась клавиатура)
+            if (newHeight < lastHeight) {
+                setTimeout(() => {
+                    const messageInput = document.getElementById('message-input');
+                    if (messageInput && document.activeElement === messageInput) {
+                        // Прокручиваем к полю ввода
+                        messageInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        
+                        // Добавляем отступ снизу для контейнера сообщений
+                        const messagesContainer = document.getElementById('messages-container');
+                        if (messagesContainer) {
+                            messagesContainer.style.paddingBottom = '200px';
+                        }
+                    }
+                }, 100);
+            } 
+            // Если высота увеличилась (скрылась клавиатура)
+            else if (newHeight > lastHeight) {
+                // Убираем дополнительный отступ
+                const messagesContainer = document.getElementById('messages-container');
+                if (messagesContainer) {
+                    messagesContainer.style.paddingBottom = '';
+                }
+                
+                // Прокручиваем к последнему сообщению
+                setTimeout(() => {
+                    this.messenger.scrollToLastMessage();
+                }, 300);
+            }
+            
+            lastHeight = newHeight;
+        });
     }
     
     addSwipeGestures() {
@@ -477,6 +688,7 @@ class MobileREonikaEnhancements {
             const diffX = startX - endX;
             const diffY = startY - endY;
             
+            // Горизонтальный свайп
             if (Math.abs(diffX) > threshold && Math.abs(diffY) < restraint) {
                 if (diffX > 0) {
                     this.handleSwipeLeft();
@@ -493,13 +705,13 @@ class MobileREonikaEnhancements {
     handleSwipeLeft() {
         if (this.messenger.currentChat && this.messenger.isMobile) {
             console.log('Свайп влево в чате');
+            // Можно добавить функциональность, например, показать меню действий
         }
     }
     
     handleSwipeRight() {
         if (this.messenger.currentChat && this.messenger.isMobile) {
             this.closeMobileChat();
-            this.messenger.showNotification('Вернулись к чатам', 'info');
         }
     }
     
@@ -538,6 +750,11 @@ class MobileREonikaEnhancements {
             return;
         }
         
+        // Проверяем, не записываем ли уже
+        if (this.messenger.isRecording) {
+            return;
+        }
+        
         const hasPermission = await this.ensureMicrophonePermission();
         
         if (hasPermission) {
@@ -551,6 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.messenger) {
             window.mobileEnhancements = new MobileREonikaEnhancements(window.messenger);
             
+            // Улучшенная отправка сообщений с корректной прокруткой
             const originalSendMessage = window.messenger.sendMessage;
             window.messenger.sendMessage = async function() {
                 await originalSendMessage.call(this);
@@ -562,9 +780,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 300);
             }.bind(window.messenger);
             
+            // Исправленные обработчики для голосовых сообщений (без дублирования)
             const voiceRecordBtn = document.getElementById('voice-record-btn');
             if (voiceRecordBtn) {
-                voiceRecordBtn.addEventListener('mousedown', () => {
+                // Удаляем старые обработчики чтобы избежать дублирования
+                const newVoiceBtn = voiceRecordBtn.cloneNode(true);
+                voiceRecordBtn.parentNode.replaceChild(newVoiceBtn, voiceRecordBtn);
+                
+                // Добавляем новые обработчики
+                newVoiceBtn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     if (window.mobileEnhancements) {
                         window.mobileEnhancements.startVoiceRecordingWithPermission();
                     } else {
@@ -572,13 +798,41 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
                 
-                voiceRecordBtn.addEventListener('touchstart', (e) => {
+                newVoiceBtn.addEventListener('touchstart', (e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     if (window.mobileEnhancements) {
                         window.mobileEnhancements.startVoiceRecordingWithPermission();
                     } else {
                         window.messenger.startVoiceRecording();
                     }
+                });
+                
+                // Остановка записи
+                document.addEventListener('mouseup', () => {
+                    if (window.messenger.isRecording) {
+                        window.messenger.stopVoiceRecording();
+                    }
+                });
+                
+                document.addEventListener('touchend', (e) => {
+                    if (window.messenger.isRecording) {
+                        e.preventDefault();
+                        window.messenger.stopVoiceRecording();
+                    }
+                });
+            }
+            
+            // Обработчик для поля ввода на мобильных устройствах
+            const messageInput = document.getElementById('message-input');
+            if (messageInput && window.messenger.isMobile) {
+                messageInput.addEventListener('focus', () => {
+                    // Не прокручиваем автоматически, только когда пользователь сам коснется
+                    setTimeout(() => {
+                        if (window.messenger.scrollToLastMessage) {
+                            window.messenger.scrollToLastMessage();
+                        }
+                    }, 500);
                 });
             }
             
@@ -588,5 +842,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
+    // Запускаем проверку с задержкой
     setTimeout(checkMessenger, 1000);
 });

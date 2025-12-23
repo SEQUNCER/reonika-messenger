@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>REonika - Современный мессенджер</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -22,12 +22,12 @@
                 <form id="login-form">
                     <div class="input-group">
                         <label for="login-email" style="color: rgba(255, 255, 255, 0.9);">Email</label>
-                        <input type="email" id="login-email" required placeholder="Ваш email" style="background-color: rgba(255, 255, 255, 0.1); color: #2d3748; border-color: rgba(255, 255, 255, 0.2);">
+                        <input type="email" id="login-email" required placeholder="Ваш email" style="background-color: rgba(255, 255, 255, 0.1); color: #fff; border-color: rgba(255, 255, 255, 0.2);">
                     </div>
                     
                     <div class="input-group">
                         <label for="login-password" style="color: rgba(255, 255, 255, 0.9);">Пароль</label>
-                        <input type="password" id="login-password" required placeholder="Ваш пароль" style="background-color: rgba(255, 255, 255, 0.1); color: #2d3748; border-color: rgba(255, 255, 255, 0.2);">
+                        <input type="password" id="login-password" required placeholder="Ваш пароль" style="background-color: rgba(255, 255, 255, 0.1); color: #fff; border-color: rgba(255, 255, 255, 0.2);">
                     </div>
                     
                     <button type="button" id="login-btn" class="btn-primary" style="width: 100%; background-color: white; color: #667eea;">
@@ -35,24 +35,24 @@
                     </button>
                     
                     <div class="form-footer">
-                        <p style="color: #4299e1;">Нет аккаунта? <a href="#" id="show-register" style="color: #4299e1; font-weight: 500; text-decoration: underline;">Зарегистрироваться</a></p>
+                        <p style="color: #fff;">Нет аккаунта? <a href="#" id="show-register" style="color: #fff; font-weight: 500; text-decoration: underline;">Зарегистрироваться</a></p>
                     </div>
                 </form>
                 
                 <form id="register-form" class="hidden">
                     <div class="input-group">
                         <label for="register-username" style="color: rgba(255, 255, 255, 0.9);">Имя пользователя</label>
-                        <input type="text" id="register-username" required placeholder="Придумайте имя" minlength="3" style="background-color: rgba(255, 255, 255, 0.1); color: #2d3748; border-color: rgba(255, 255, 255, 0.2);">
+                        <input type="text" id="register-username" required placeholder="Придумайте имя" minlength="3" style="background-color: rgba(255, 255, 255, 0.1); color: #fff; border-color: rgba(255, 255, 255, 0.2);">
                     </div>
                     
                     <div class="input-group">
                         <label for="register-email" style="color: rgba(255, 255, 255, 0.9);">Email</label>
-                        <input type="email" id="register-email" required placeholder="Ваш email" style="background-color: rgba(255, 255, 255, 0.1); color: #2d3748; border-color: rgba(255, 255, 255, 0.2);">
+                        <input type="email" id="register-email" required placeholder="Ваш email" style="background-color: rgba(255, 255, 255, 0.1); color: #fff; border-color: rgba(255, 255, 255, 0.2);">
                     </div>
                     
                     <div class="input-group">
                         <label for="register-password" style="color: rgba(255, 255, 255, 0.9);">Пароль</label>
-                        <input type="password" id="register-password" required placeholder="Не менее 6 символов" minlength="6" style="background-color: rgba(255, 255, 255, 0.1); color: #2d3748; border-color: rgba(255, 255, 255, 0.2);">
+                        <input type="password" id="register-password" required placeholder="Не менее 6 символов" minlength="6" style="background-color: rgba(255, 255, 255, 0.1); color: #fff; border-color: rgba(255, 255, 255, 0.2);">
                     </div>
                     
                     <button type="button" id="register-btn" class="btn-primary" style="width: 100%; background-color: white; color: #667eea;">
@@ -60,7 +60,7 @@
                     </button>
                     
                     <div class="form-footer">
-                        <p style="color: #4299e1;">Уже есть аккаунт? <a href="#" id="show-login" style="color: #4299e1; font-weight: 500; text-decoration: underline;">Войти</a></p>
+                        <p style="color: #fff;">Уже есть аккаунт? <a href="#" id="show-login" style="color: #fff; font-weight: 500; text-decoration: underline;">Войти</a></p>
                     </div>
                 </form>
             </div>
@@ -112,7 +112,7 @@
                     </div>
                     
                     <div class="search-container">
-                        <input type="text" id="user-search" placeholder="Поиск по имени или email...">
+                        <input type="text" id="user-search" placeholder="Поиск по имени или email..." autocomplete="off">
                         <button id="search-user-btn" class="btn-primary tooltip" data-tooltip="Поиск пользователей">
                             <i class="fas fa-search"></i>
                         </button>
@@ -129,6 +129,7 @@
                 <!-- Область чата -->
                 <div class="chat-area" id="chat-area">
                     <div class="chat-header" id="chat-header" style="display: none;">
+                        <!-- Кнопка "Назад" будет добавлена динамически mobile-enhancements.js -->
                         
                         <div class="chat-partner-info">
                             <div class="avatar" id="chat-partner-avatar"></div>
@@ -155,7 +156,7 @@
                     </div>
                     
                     <div class="chat-input-container" id="chat-input-container" style="display: none;">
-                        <input type="text" id="message-input" placeholder="Введите сообщение..." disabled>
+                        <input type="text" id="message-input" placeholder="Введите сообщение..." disabled autocomplete="off">
                         <button id="voice-record-btn" class="btn-icon tooltip" data-tooltip="Голосовое сообщение (удерживайте)">
                             <i class="fas fa-microphone"></i>
                         </button>
@@ -195,7 +196,7 @@
                         
                         <div class="profile-field">
                             <label for="profile-username">Имя пользователя</label>
-                            <input type="text" id="profile-username" placeholder="Введите ваше имя" required>
+                            <input type="text" id="profile-username" placeholder="Введите ваше имя" required autocomplete="off">
                         </div>
                         
                         <div class="profile-field">
@@ -205,7 +206,7 @@
                         
                         <div class="profile-field">
                             <label for="profile-status">Статус</label>
-                            <input type="text" id="profile-status" placeholder="Напишите что-нибудь о себе...">
+                            <input type="text" id="profile-status" placeholder="Напишите что-нибудь о себе..." autocomplete="off">
                         </div>
                         
                         <button type="button" id="save-profile-btn" class="btn-primary" style="width: 100%;">
@@ -218,17 +219,17 @@
                         
                         <div class="profile-field">
                             <label for="current-password">Текущий пароль</label>
-                            <input type="password" id="current-password" placeholder="Для подтверждения изменений">
+                            <input type="password" id="current-password" placeholder="Для подтверждения изменений" autocomplete="off">
                         </div>
                         
                         <div class="profile-field">
                             <label for="new-password">Новый пароль</label>
-                            <input type="password" id="new-password" placeholder="Оставьте пустым, если не хотите менять">
+                            <input type="password" id="new-password" placeholder="Оставьте пустым, если не хотите менять" autocomplete="off">
                         </div>
                         
                         <div class="profile-field">
                             <label for="confirm-password">Подтвердите пароль</label>
-                            <input type="password" id="confirm-password" placeholder="Повторите новый пароль">
+                            <input type="password" id="confirm-password" placeholder="Повторите новый пароль" autocomplete="off">
                         </div>
                         
                         <button type="button" id="change-password-btn" class="btn-secondary-outline">
@@ -269,6 +270,15 @@
         </div>
     </div>
 
+    <!-- Индикатор записи голосового сообщения -->
+    <div id="voice-recording-indicator" class="hidden">
+        <div class="voice-recording-indicator">
+            <i class="fas fa-microphone"></i>
+            <div class="voice-recording-timer" id="recording-timer">00:00</div>
+            <div class="voice-recording-hint">Отпустите кнопку, чтобы отправить голосовое сообщение</div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module" src="supabase.js"></script>
     <script type="module" src="app.js"></script>
@@ -276,6 +286,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Проверка поддержки необходимых API
             if (!window.indexedDB) {
                 alert('Ваш браузер не поддерживает IndexedDB. Некоторые функции могут работать некорректно.');
             }
@@ -292,6 +303,62 @@
                     voiceBtn.style.display = 'none';
                 }
             }
+            
+            // Проверяем, мобильное ли устройство
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // Добавляем класс для мобильных устройств
+            if (isMobile) {
+                document.body.classList.add('mobile-device');
+            }
+            
+            // Улучшение для мобильных устройств
+            if (isMobile) {
+                // Предотвращаем масштабирование при двойном тапе
+                let lastTouchEnd = 0;
+                document.addEventListener('touchend', function(event) {
+                    const now = (new Date()).getTime();
+                    if (now - lastTouchEnd <= 300) {
+                        event.preventDefault();
+                    }
+                    lastTouchEnd = now;
+                }, false);
+                
+                // Улучшаем отзывчивость кнопок
+                const buttons = document.querySelectorAll('button, .btn-primary, .btn-icon');
+                buttons.forEach(button => {
+                    button.style.cursor = 'pointer';
+                });
+            }
+            
+            // Отключаем контекстное меню на кнопках (для длинного нажатия на мобильных)
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(button => {
+                button.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    return false;
+                });
+            });
+            
+            // Улучшаем поведение полей ввода на мобильных
+            const inputs = document.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                // Предотвращаем масштабирование при фокусе
+                input.addEventListener('focus', function() {
+                    if (isMobile) {
+                        this.style.fontSize = '16px';
+                    }
+                });
+                
+                // Восстанавливаем размер шрифта при потере фокуса
+                input.addEventListener('blur', function() {
+                    if (isMobile) {
+                        this.style.fontSize = '';
+                    }
+                });
+            });
+            
+            console.log('Приложение инициализировано. Мобильная поддержка:', isMobile);
         });
     </script>
 </body>

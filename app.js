@@ -33,18 +33,14 @@ class REonikaMessenger {
         // Запускаем ежедневную очистку старых сообщений
         this.startAutoCleanup();
 
-    // В конце конструктора REonikaMessenger (после this.startAutoCleanup())
+        // В конце конструктора REonikaMessenger (после this.startAutoCleanup())
         setTimeout(() => {
             // Инициализируем мобильные улучшения если они загружены
             if (window.mobileEnhancements) {
                 console.log('Мобильные улучшения интегрированы');
             }
         }, 500);
-
     }
-
-
-    
 
     initEventListeners() {
         // Авторизация
@@ -82,12 +78,6 @@ class REonikaMessenger {
         const navProfileBtn = document.getElementById('nav-profile-btn');
         if (navProfileBtn) {
             navProfileBtn.addEventListener('click', () => this.showProfileScreen());
-        }
-
-        // Кнопка "Назад" в мобильном чате
-        const backToChatsBtn = document.getElementById('back-to-chats');
-        if (backToChatsBtn) {
-            backToChatsBtn.addEventListener('click', () => this.closeMobileChat());
         }
 
         // Удаление чата
@@ -136,6 +126,15 @@ class REonikaMessenger {
                     this.sendMessage();
                 }
             });
+            
+            // Обработчик для мобильных устройств - предотвращаем автофокус
+            if (this.isMobile) {
+                messageInput.addEventListener('focus', () => {
+                    setTimeout(() => {
+                        this.scrollToLastMessage();
+                    }, 300);
+                });
+            }
         }
 
         // Загрузка файлов в чат
@@ -167,18 +166,29 @@ class REonikaMessenger {
             deleteAccountBtn.addEventListener('click', () => this.showDeleteAccountConfirm());
         }
 
-        // Голосовые сообщения
+        // Голосовые сообщения (обновленные обработчики)
         const voiceRecordBtn = document.getElementById('voice-record-btn');
         if (voiceRecordBtn) {
-            // Начало записи при нажатии
-            voiceRecordBtn.addEventListener('mousedown', () => this.startVoiceRecording());
-            voiceRecordBtn.addEventListener('touchstart', (e) => {
+            // Убираем старые обработчики чтобы избежать дублирования
+            voiceRecordBtn.addEventListener('mousedown', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 this.startVoiceRecording();
             });
             
-            // Окончание записи при отпускании
-            document.addEventListener('mouseup', () => this.stopVoiceRecording());
+            voiceRecordBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.startVoiceRecording();
+            });
+            
+            // Остановка записи при отпускании
+            document.addEventListener('mouseup', () => {
+                if (this.isRecording) {
+                    this.stopVoiceRecording();
+                }
+            });
+            
             document.addEventListener('touchend', (e) => {
                 if (this.isRecording) {
                     e.preventDefault();
@@ -218,15 +228,32 @@ class REonikaMessenger {
         });
     }
 
-    // Мобильный чат
+    // Мобильный чат - обновленный метод
     closeMobileChat() {
-        if (this.isMobile) {
+        if (this.isMobile && this.currentChat) {
             const chatArea = document.getElementById('chat-area');
             if (chatArea) {
                 chatArea.classList.remove('chat-active');
             }
+            
+            // Показываем список чатов
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar) {
+                sidebar.style.display = 'block';
+            }
+            
             this.currentChat = null;
             this.updateChatUI();
+            
+            // Возвращаемся к списку чатов
+            this.showChatsList();
+        }
+    }
+    
+    showChatsList() {
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar && this.isMobile) {
+            sidebar.style.display = 'block';
         }
     }
 
@@ -707,6 +734,11 @@ class REonikaMessenger {
         if (profileScreen) profileScreen.classList.add('hidden');
         if (navChatsBtn) navChatsBtn.classList.add('active');
         if (navProfileBtn) navProfileBtn.classList.remove('active');
+        
+        // На мобильных показываем список чатов
+        if (this.isMobile) {
+            this.showChatsList();
+        }
     }
 
     showProfileScreen() {
@@ -1023,6 +1055,7 @@ class REonikaMessenger {
         }
     }
 
+    // Обновленный метод selectChat с исправлением автофокуса
     async selectChat(chat) {
         try {
             this.currentChat = chat;
@@ -1038,7 +1071,12 @@ class REonikaMessenger {
             
             if (messageInput) {
                 messageInput.disabled = false;
-                messageInput.focus();
+                // НЕ фокусируем автоматически на мобильных устройствах
+                if (!this.isMobile) {
+                    setTimeout(() => {
+                        messageInput.focus();
+                    }, 100);
+                }
             }
             if (sendBtn) sendBtn.disabled = false;
             
@@ -1051,16 +1089,53 @@ class REonikaMessenger {
             if (chatHeader) chatHeader.style.display = 'flex';
             if (chatInputContainer) chatInputContainer.style.display = 'flex';
             if (noChatSelected) noChatSelected.style.display = 'none';
+            
+            // На мобильных скрываем список чатов и показываем чат
             if (this.isMobile && chatArea) {
                 chatArea.classList.add('chat-active');
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar) {
+                    sidebar.style.display = 'none';
+                }
             }
             
             this.hideSearchResults();
+            
+            // Прокручиваем к последнему сообщению
+            setTimeout(() => {
+                this.scrollToLastMessage();
+            }, 300);
             
         } catch (error) {
             console.error('Error selecting chat:', error);
             this.showNotification('Ошибка выбора чата', 'error');
         }
+    }
+    
+    // Метод для прокрутки к последнему сообщению
+    scrollToLastMessage() {
+        const container = document.getElementById('messages-container');
+        if (!container) return;
+        
+        const messages = container.querySelectorAll('.message');
+        if (messages.length === 0) return;
+        
+        const lastMessage = messages[messages.length - 1];
+        const inputContainer = document.getElementById('chat-input-container');
+        
+        let inputHeight = 0;
+        if (inputContainer && inputContainer.style.display !== 'none') {
+            inputHeight = inputContainer.offsetHeight;
+        }
+        
+        const lastMessageBottom = lastMessage.offsetTop + lastMessage.offsetHeight;
+        const containerHeight = container.clientHeight;
+        const scrollPosition = Math.max(0, lastMessageBottom - containerHeight + inputHeight + 20);
+        
+        container.scrollTo({
+            top: scrollPosition,
+            behavior: 'smooth'
+        });
     }
 
     async loadMessages(chatId) {
@@ -1149,7 +1224,10 @@ class REonikaMessenger {
 
             if (input) {
                 input.value = '';
-                input.focus();
+                // Не фокусируем автоматически на мобильных
+                if (!this.isMobile) {
+                    input.focus();
+                }
             }
             
             // Немедленно обновляем сообщения
@@ -1337,6 +1415,7 @@ class REonikaMessenger {
         event.target.value = '';
     }
 
+    // Исправленный метод saveProfile
     async saveProfile() {
         const usernameInput = document.getElementById('profile-username');
         const statusInput = document.getElementById('profile-status');
@@ -1352,7 +1431,7 @@ class REonikaMessenger {
         try {
             const updates = {
                 username: username,
-                status: status,
+                status: status || null, // Разрешаем пустой статус
                 updated_at: new Date().toISOString()
             };
 
@@ -1363,7 +1442,16 @@ class REonikaMessenger {
 
             if (error) {
                 console.error('Error updating profile:', error);
-                this.showNotification('Ошибка сохранения профиля', 'error');
+                
+                // Более информативное сообщение об ошибке
+                let errorMessage = 'Ошибка сохранения профиля';
+                if (error.code === '23514') {
+                    errorMessage = 'Некорректные данные в профиле';
+                } else if (error.message.includes('username')) {
+                    errorMessage = 'Имя пользователя уже занято';
+                }
+                
+                this.showNotification(errorMessage, 'error');
                 return;
             }
 
@@ -1381,7 +1469,7 @@ class REonikaMessenger {
             
         } catch (error) {
             console.error('Save profile exception:', error);
-            this.showNotification('Ошибка сохранения профиля', 'error');
+            this.showNotification('Ошибка сохранения профиля. Проверьте подключение к интернету', 'error');
         }
     }
 
@@ -1600,6 +1688,8 @@ class REonikaMessenger {
                     `;
                     if (this.isMobile && chatArea) {
                         chatArea.classList.remove('chat-active');
+                        // Показываем список чатов
+                        this.showChatsList();
                     }
                     
                 } catch (error) {
@@ -1665,13 +1755,13 @@ class REonikaMessenger {
                     
                 } catch (error) {
                     console.error('Delete account exception:', error);
-                    this.showNotification('Ошибка удаления аккаунта', 'error');
+                    this.showNotification('Ошибка удаления аккаунт', 'error');
                 }
             }
         );
     }
 
-    // Голосовые сообщения
+    // Голосовые сообщения (исправленные методы)
     async startVoiceRecording() {
         if (this.isRecording) return;
         
@@ -1697,14 +1787,19 @@ class REonikaMessenger {
             
             // При окончании записи
             this.mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-                await this.sendVoiceMessage(audioBlob);
-                
-                // Останавливаем все треки
-                stream.getTracks().forEach(track => track.stop());
-                
-                // Скрываем индикатор записи
-                this.hideRecordingIndicator();
+                try {
+                    const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                    await this.sendVoiceMessage(audioBlob);
+                } catch (error) {
+                    console.error('Error in voice recording onstop:', error);
+                    this.showNotification('Ошибка обработки записи', 'error');
+                } finally {
+                    // Останавливаем все треки
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    // Уже скрыли индикатор в stopVoiceRecording, но на всякий случай
+                    this.hideRecordingIndicator();
+                }
             };
             
             // Запускаем запись
@@ -1739,6 +1834,9 @@ class REonikaMessenger {
             clearInterval(this.recordingTimer);
             this.recordingTimer = null;
         }
+        
+        // Скрываем индикатор записи НЕМЕДЛЕННО
+        this.hideRecordingIndicator();
     }
 
     showRecordingIndicator() {
@@ -1758,7 +1856,15 @@ class REonikaMessenger {
     hideRecordingIndicator() {
         const indicator = document.getElementById('voice-recording-indicator');
         if (indicator) {
-            indicator.remove();
+            // Добавляем анимацию исчезновения
+            indicator.style.opacity = '0';
+            indicator.style.transform = 'translate(-50%, -50%) scale(0.9)';
+            
+            setTimeout(() => {
+                if (indicator.parentNode) {
+                    indicator.remove();
+                }
+            }, 300);
         }
     }
 
@@ -1784,11 +1890,14 @@ class REonikaMessenger {
     }
 
     async sendVoiceMessage(audioBlob) {
-        if (!this.currentChat || !this.currentUser) return;
+        if (!this.currentChat || !this.currentUser) {
+            console.error('Cannot send voice message: no active chat or user');
+            return;
+        }
         
         // Проверяем, является ли пользователь участником чата
         const isParticipant = this.currentChat.user1_id === this.currentUser.id || 
-                              this.currentChat.user2_id === this.currentUser.id;
+                            this.currentChat.user2_id === this.currentUser.id;
         
         if (!isParticipant) {
             this.showNotification('Вы не участник этого чата', 'error');
@@ -1828,42 +1937,56 @@ class REonikaMessenger {
             const audio = new Audio();
             audio.src = URL.createObjectURL(audioBlob);
             
-            audio.onloadedmetadata = async () => {
-                const duration = Math.round(audio.duration);
-                
-                // Создаем сообщение
-                const { error: messageError } = await supabase
-                    .from('messages')
-                    .insert([
-                        {
-                            chat_id: this.currentChat.id,
-                            sender_id: this.currentUser.id,
-                            content: '🎤 Голосовое сообщение',
-                            voice_url: publicUrl,
-                            voice_duration: duration,
-                            created_at: new Date().toISOString(),
-                            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 часа
-                            is_read: false
+            return new Promise((resolve, reject) => {
+                audio.onloadedmetadata = async () => {
+                    try {
+                        const duration = Math.round(audio.duration);
+                        
+                        // Создаем сообщение
+                        const { error: messageError } = await supabase
+                            .from('messages')
+                            .insert([
+                                {
+                                    chat_id: this.currentChat.id,
+                                    sender_id: this.currentUser.id,
+                                    content: '🎤 Голосовое сообщение',
+                                    voice_url: publicUrl,
+                                    voice_duration: duration,
+                                    created_at: new Date().toISOString(),
+                                    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 часа
+                                    is_read: false
+                                }
+                            ]);
+
+                        if (messageError) {
+                            console.error('Message insert error:', messageError);
+                            throw new Error(`Ошибка сохранения сообщения: ${messageError.message}`);
                         }
-                    ]);
 
-                if (messageError) {
-                    console.error('Message insert error:', messageError);
-                    throw new Error(`Ошибка сохранения сообщения: ${messageError.message}`);
-                }
-
-                this.showNotification('Голосовое сообщение отправлено', 'success');
+                        this.showNotification('Голосовое сообщение отправлено', 'success');
+                        
+                        // Немедленно обновляем сообщения
+                        await this.loadMessages(this.currentChat.id);
+                        
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    } finally {
+                        // Освобождаем URL
+                        URL.revokeObjectURL(audio.src);
+                    }
+                };
                 
-                // Освобождаем URL
-                URL.revokeObjectURL(audio.src);
-                
-                // Немедленно обновляем сообщения
-                await this.loadMessages(this.currentChat.id);
-            };
+                audio.onerror = () => {
+                    reject(new Error('Не удалось загрузить аудио'));
+                    URL.revokeObjectURL(audio.src);
+                };
+            });
             
         } catch (error) {
             console.error('Error sending voice message:', error);
             this.showNotification(`Ошибка отправки голосового сообщения: ${error.message}`, 'error');
+            throw error;
         }
     }
 
@@ -2463,6 +2586,8 @@ class REonikaMessenger {
         }
     }
 }
+
+
 
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
