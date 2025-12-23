@@ -78,19 +78,27 @@
                 </a>
                 
                 <div class="nav-links">
+                    <button id="nav-chats-btn" class="active">
+                        <i class="fas fa-comments"></i>
+                        <span>Чаты</span>
+                    </button>
+                    <button id="nav-profile-btn">
+                        <i class="fas fa-user"></i>
+                        <span>Профиль</span>
+                    </button>
                     <div class="user-info">
                         <div class="avatar" id="nav-avatar"></div>
                         <span id="nav-username">Пользователь</span>
                     </div>
-                    <!-- Кнопка удаления аккаунта будет добавлена динамически -->
                     <button id="logout-btn" class="btn-primary">
-                        <i class="fas fa-sign-out-alt"></i> Выйти
+                        <i class="fas fa-sign-out-alt"></i> <span>Выйти</span>
                     </button>
                 </div>
             </div>
         </nav>
 
-        <div class="container">
+        <!-- Экран чатов -->
+        <div id="chats-screen" class="container">
             <div class="app-container">
                 <!-- Боковая панель -->
                 <div class="sidebar">
@@ -99,7 +107,7 @@
                         <div class="user-details">
                             <h3 id="current-user-name">Загрузка...</h3>
                             <p id="current-user-email">...</p>
-                            <p id="current-user-updated" class="user-status"></p>
+                            <p id="current-user-status" class="user-status"></p>
                         </div>
                     </div>
                     
@@ -119,8 +127,9 @@
                 </div>
                 
                 <!-- Область чата -->
-                <div class="chat-area">
+                <div class="chat-area" id="chat-area">
                     <div class="chat-header" id="chat-header" style="display: none;">
+                        
                         <div class="chat-partner-info">
                             <div class="avatar" id="chat-partner-avatar"></div>
                             <div>
@@ -130,7 +139,9 @@
                                 </span>
                             </div>
                         </div>
-                        <!-- Кнопка удаления чата будет добавлена динамически -->
+                        <button id="delete-chat-btn" class="btn-icon tooltip" data-tooltip="Удалить чат">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </div>
                     
                     <div class="chat-messages" id="messages-container">
@@ -145,19 +156,98 @@
                     
                     <div class="chat-input-container" id="chat-input-container" style="display: none;">
                         <input type="text" id="message-input" placeholder="Введите сообщение..." disabled>
+                        <button id="voice-record-btn" class="btn-icon tooltip" data-tooltip="Голосовое сообщение (удерживайте)">
+                            <i class="fas fa-microphone"></i>
+                        </button>
                         <label for="image-upload" class="btn-icon tooltip" data-tooltip="Отправить изображение">
                             <i class="fas fa-image"></i>
                             <input type="file" id="image-upload" accept="image/*" style="display: none;">
-                        </label>
-                        <label for="avatar-upload" class="btn-icon tooltip" data-tooltip="Сменить аватар">
-                            <i class="fas fa-user-circle"></i>
-                            <input type="file" id="avatar-upload" accept="image/*" style="display: none;">
                         </label>
                         <button id="send-btn" class="btn-primary" disabled>
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Экран профиля -->
+        <div id="profile-screen" class="container hidden">
+            <div class="profile-container">
+                <div class="profile-header">
+                    <h1>Мой профиль</h1>
+                    <p>Управление вашей учетной записью и настройками</p>
+                </div>
+                
+                <div class="profile-avatar-container">
+                    <div class="avatar large" id="profile-avatar">
+                        <!-- Аватар будет загружен динамически -->
+                    </div>
+                    <label for="profile-avatar-upload" class="avatar-overlay">
+                        <i class="fas fa-camera"></i>
+                        <input type="file" id="profile-avatar-upload" accept="image/*" style="display: none;">
+                    </label>
+                </div>
+                
+                <form class="profile-form" id="profile-form">
+                    <div class="form-section">
+                        <h3><i class="fas fa-user-edit"></i> Основная информация</h3>
+                        
+                        <div class="profile-field">
+                            <label for="profile-username">Имя пользователя</label>
+                            <input type="text" id="profile-username" placeholder="Введите ваше имя" required>
+                        </div>
+                        
+                        <div class="profile-field">
+                            <label for="profile-email">Email</label>
+                            <input type="email" id="profile-email" placeholder="Ваш email" disabled>
+                        </div>
+                        
+                        <div class="profile-field">
+                            <label for="profile-status">Статус</label>
+                            <input type="text" id="profile-status" placeholder="Напишите что-нибудь о себе...">
+                        </div>
+                        
+                        <button type="button" id="save-profile-btn" class="btn-primary" style="width: 100%;">
+                            <i class="fas fa-save"></i> Сохранить изменения
+                        </button>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3><i class="fas fa-lock"></i> Безопасность</h3>
+                        
+                        <div class="profile-field">
+                            <label for="current-password">Текущий пароль</label>
+                            <input type="password" id="current-password" placeholder="Для подтверждения изменений">
+                        </div>
+                        
+                        <div class="profile-field">
+                            <label for="new-password">Новый пароль</label>
+                            <input type="password" id="new-password" placeholder="Оставьте пустым, если не хотите менять">
+                        </div>
+                        
+                        <div class="profile-field">
+                            <label for="confirm-password">Подтвердите пароль</label>
+                            <input type="password" id="confirm-password" placeholder="Повторите новый пароль">
+                        </div>
+                        
+                        <button type="button" id="change-password-btn" class="btn-secondary-outline">
+                            <i class="fas fa-key"></i> Изменить пароль
+                        </button>
+                    </div>
+                    
+                    <div class="form-section danger-zone">
+                        <h3><i class="fas fa-exclamation-triangle"></i> Опасная зона</h3>
+                        
+                        <p>Эти действия необратимы. Пожалуйста, будьте осторожны.</p>
+                        
+                        <div class="profile-field">
+                            <button type="button" id="delete-account-btn" class="btn-danger">
+                                <i class="fas fa-user-slash"></i> Удалить аккаунт
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -167,12 +257,23 @@
         <div class="loading"></div>
     </div>
 
+    <!-- Модальное окно подтверждения -->
+    <div id="confirm-modal" class="confirm-modal hidden">
+        <div class="confirm-modal-content">
+            <h3 id="confirm-modal-title">Подтвердите действие</h3>
+            <p id="confirm-modal-message">Вы уверены, что хотите выполнить это действие?</p>
+            <div class="confirm-modal-buttons">
+                <button id="confirm-modal-cancel" class="confirm-modal-cancel">Отмена</button>
+                <button id="confirm-modal-confirm" class="confirm-modal-confirm">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module" src="supabase.js"></script>
     <script type="module" src="app.js"></script>
     
     <script>
-        // Проверка поддержки всех необходимых функций
         document.addEventListener('DOMContentLoaded', function() {
             if (!window.indexedDB) {
                 alert('Ваш браузер не поддерживает IndexedDB. Некоторые функции могут работать некорректно.');
@@ -180,6 +281,15 @@
             
             if (!window.Notification || !('serviceWorker' in navigator)) {
                 console.warn('Уведомления и офлайн-режим недоступны в этом браузере');
+            }
+            
+            // Проверяем поддержку Web Audio API для голосовых сообщений
+            if (!window.MediaRecorder) {
+                console.warn('Голосовые сообщения недоступны в этом браузере');
+                const voiceBtn = document.getElementById('voice-record-btn');
+                if (voiceBtn) {
+                    voiceBtn.style.display = 'none';
+                }
             }
         });
     </script>

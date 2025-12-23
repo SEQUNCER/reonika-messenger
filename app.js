@@ -7,18 +7,31 @@ class REonikaMessenger {
         this.chats = [];
         this.messages = [];
         this.onlineUsers = new Set();
+        this.voiceMessages = new Map(); // Для хранения аудио объектов
         
         this.searchTimeout = null;
         this.updateInterval = null;
         this.realtimeSubscriptions = [];
         this.isMobile = window.innerWidth <= 768;
         
+        // Голосовые сообщения
+        this.isRecording = false;
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.recordingStartTime = null;
+        this.recordingTimer = null;
+        this.currentAudio = null;
+        
         this.initEventListeners();
         this.checkAuth();
         
         window.addEventListener('resize', () => {
             this.isMobile = window.innerWidth <= 768;
+            this.updateChatUI();
         });
+        
+        // Запускаем ежедневную очистку старых сообщений
+        this.startAutoCleanup();
     }
 
     initEventListeners() {
@@ -48,10 +61,27 @@ class REonikaMessenger {
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) logoutBtn.addEventListener('click', () => this.logout());
 
-        // Удаление аккаунта
-        const deleteAccountBtn = document.getElementById('delete-account-btn');
-        if (deleteAccountBtn) {
-            deleteAccountBtn.addEventListener('click', () => this.deleteAccount());
+        // Навигация между экранами
+        const navChatsBtn = document.getElementById('nav-chats-btn');
+        if (navChatsBtn) {
+            navChatsBtn.addEventListener('click', () => this.showChatsScreen());
+        }
+        
+        const navProfileBtn = document.getElementById('nav-profile-btn');
+        if (navProfileBtn) {
+            navProfileBtn.addEventListener('click', () => this.showProfileScreen());
+        }
+
+        // Кнопка "Назад" в мобильном чате
+        const backToChatsBtn = document.getElementById('back-to-chats');
+        if (backToChatsBtn) {
+            backToChatsBtn.addEventListener('click', () => this.closeMobileChat());
+        }
+
+        // Удаление чата
+        const deleteChatBtn = document.getElementById('delete-chat-btn');
+        if (deleteChatBtn) {
+            deleteChatBtn.addEventListener('click', () => this.deleteChat());
         }
 
         // Поиск пользователей с автоопределением
@@ -66,7 +96,6 @@ class REonikaMessenger {
                 if (e.key === 'Enter') this.searchUser();
             });
             
-            // Автоопределение при вводе
             userSearch.addEventListener('input', (e) => {
                 const searchText = e.target.value.trim();
                 if (searchText.length >= 2) {
@@ -76,7 +105,6 @@ class REonikaMessenger {
                 }
             });
             
-            // Очистка результатов при изменении текста
             userSearch.addEventListener('input', () => {
                 if (!userSearch.value.trim()) {
                     this.hideSearchResults();
@@ -98,15 +126,64 @@ class REonikaMessenger {
             });
         }
 
-        // Загрузка файлов
-        const avatarUpload = document.getElementById('avatar-upload');
-        if (avatarUpload) {
-            avatarUpload.addEventListener('change', (e) => this.uploadAvatar(e));
-        }
-        
+        // Загрузка файлов в чат
         const imageUpload = document.getElementById('image-upload');
         if (imageUpload) {
             imageUpload.addEventListener('change', (e) => this.uploadImage(e));
+        }
+        
+        // Загрузка аватара в профиле
+        const profileAvatarUpload = document.getElementById('profile-avatar-upload');
+        if (profileAvatarUpload) {
+            profileAvatarUpload.addEventListener('change', (e) => this.uploadProfileAvatar(e));
+        }
+
+        // Сохранение профиля
+        const saveProfileBtn = document.getElementById('save-profile-btn');
+        if (saveProfileBtn) {
+            saveProfileBtn.addEventListener('click', () => this.saveProfile());
+        }
+        
+        const changePasswordBtn = document.getElementById('change-password-btn');
+        if (changePasswordBtn) {
+            changePasswordBtn.addEventListener('click', () => this.changePassword());
+        }
+
+        // Удаление аккаунта
+        const deleteAccountBtn = document.getElementById('delete-account-btn');
+        if (deleteAccountBtn) {
+            deleteAccountBtn.addEventListener('click', () => this.showDeleteAccountConfirm());
+        }
+
+        // Голосовые сообщения
+        const voiceRecordBtn = document.getElementById('voice-record-btn');
+        if (voiceRecordBtn) {
+            // Начало записи при нажатии
+            voiceRecordBtn.addEventListener('mousedown', () => this.startVoiceRecording());
+            voiceRecordBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.startVoiceRecording();
+            });
+            
+            // Окончание записи при отпускании
+            document.addEventListener('mouseup', () => this.stopVoiceRecording());
+            document.addEventListener('touchend', (e) => {
+                if (this.isRecording) {
+                    e.preventDefault();
+                    this.stopVoiceRecording();
+                }
+            });
+        }
+
+        // Модальное окно подтверждения
+        const confirmModalCancel = document.getElementById('confirm-modal-cancel');
+        if (confirmModalCancel) {
+            confirmModalCancel.addEventListener('click', () => this.hideConfirmModal());
+        }
+        
+        const confirmModalConfirm = document.getElementById('confirm-modal-confirm');
+        if (confirmModalConfirm) {
+            confirmModalConfirm.addEventListener('click', () => this.handleConfirmAction());
         }
         
         // Клик вне области результатов поиска
@@ -127,6 +204,18 @@ class REonikaMessenger {
         document.addEventListener('visibilitychange', () => {
             this.updateOnlineStatus(document.visibilityState === 'visible');
         });
+    }
+
+    // Мобильный чат
+    closeMobileChat() {
+        if (this.isMobile) {
+            const chatArea = document.getElementById('chat-area');
+            if (chatArea) {
+                chatArea.classList.remove('chat-active');
+            }
+            this.currentChat = null;
+            this.updateChatUI();
+        }
     }
 
     // Дебаунс для поиска
@@ -203,6 +292,19 @@ class REonikaMessenger {
                     if (this.currentChat && payload.new.chat_id === this.currentChat.id) {
                         this.loadMessages(this.currentChat.id);
                     }
+                }
+            )
+            .on('postgres_changes',
+                {
+                    event: 'DELETE',
+                    schema: 'public',
+                    table: 'messages'
+                },
+                (payload) => {
+                    if (this.currentChat && payload.old.chat_id === this.currentChat.id) {
+                        this.loadMessages(this.currentChat.id);
+                    }
+                    this.loadChats();
                 }
             )
             .subscribe();
@@ -320,8 +422,10 @@ class REonikaMessenger {
                 if (this.currentChat) {
                     this.loadMessages(this.currentChat.id);
                 }
+                // Автоматическая очистка старых сообщений
+                this.cleanupOldMessages();
             }
-        }, 30000);
+        }, 30000); // Каждые 30 секунд
     }
 
     async updateOnlineStatus(isOnline) {
@@ -351,7 +455,7 @@ class REonikaMessenger {
         const statusElement = document.getElementById('chat-partner-status');
         if (statusElement) {
             const isOnline = this.onlineUsers.has(partner.id);
-            statusElement.textContent = isOnline ? 'в сети' : 'не в сети';
+            statusElement.innerHTML = `<i class="fas fa-circle"></i> <span>${isOnline ? 'в сети' : 'не в сети'}</span>`;
             statusElement.style.color = isOnline ? '#48bb78' : '#718096';
         }
     }
@@ -368,6 +472,7 @@ class REonikaMessenger {
                 this.currentUser = user;
                 await this.loadUserProfile();
                 this.showMainScreen();
+                this.showChatsScreen();
                 this.setupRealtime();
                 this.updateOnlineStatus(true);
             }
@@ -423,6 +528,7 @@ class REonikaMessenger {
             this.currentUser = data.user;
             await this.loadUserProfile();
             this.showMainScreen();
+            this.showChatsScreen();
             this.showNotification('Вход выполнен успешно', 'success');
             
             // Очистка полей
@@ -548,6 +654,7 @@ class REonikaMessenger {
                             username: username,
                             email: this.currentUser.email,
                             avatar_url: null,
+                            status: 'Привет! Я использую REonika',
                             created_at: new Date().toISOString(),
                             updated_at: new Date().toISOString()
                         }
@@ -569,11 +676,39 @@ class REonikaMessenger {
             if (data) {
                 this.currentUser.profile = data;
                 this.updateUserUI();
+                this.updateProfileUI();
                 await this.loadChats();
             }
         } catch (error) {
             console.error('Load profile error:', error);
         }
+    }
+
+    // Навигация между экранами
+    showChatsScreen() {
+        const chatsScreen = document.getElementById('chats-screen');
+        const profileScreen = document.getElementById('profile-screen');
+        const navChatsBtn = document.getElementById('nav-chats-btn');
+        const navProfileBtn = document.getElementById('nav-profile-btn');
+        
+        if (chatsScreen) chatsScreen.classList.remove('hidden');
+        if (profileScreen) profileScreen.classList.add('hidden');
+        if (navChatsBtn) navChatsBtn.classList.add('active');
+        if (navProfileBtn) navProfileBtn.classList.remove('active');
+    }
+
+    showProfileScreen() {
+        const chatsScreen = document.getElementById('chats-screen');
+        const profileScreen = document.getElementById('profile-screen');
+        const navChatsBtn = document.getElementById('nav-chats-btn');
+        const navProfileBtn = document.getElementById('nav-profile-btn');
+        
+        if (chatsScreen) chatsScreen.classList.add('hidden');
+        if (profileScreen) profileScreen.classList.remove('hidden');
+        if (navChatsBtn) navChatsBtn.classList.remove('active');
+        if (navProfileBtn) navProfileBtn.classList.add('active');
+        
+        this.updateProfileUI();
     }
 
     async searchUser() {
@@ -781,9 +916,10 @@ class REonikaMessenger {
                     try {
                         const { data: lastMessage } = await supabase
                             .from('messages')
-                            .select('content, created_at, image_url, sender_id')
+                            .select('content, created_at, image_url, voice_url, sender_id, expires_at')
                             .eq('chat_id', chat.id)
                             .is('is_deleted', false)
+                            .gt('expires_at', new Date().toISOString()) // Только не истекшие сообщения
                             .order('created_at', { ascending: false })
                             .limit(1)
                             .single();
@@ -792,6 +928,8 @@ class REonikaMessenger {
                         if (lastMessage) {
                             if (lastMessage.image_url) {
                                 lastMessageText = '🖼️ Изображение';
+                            } else if (lastMessage.voice_url) {
+                                lastMessageText = '🎤 Голосовое сообщение';
                             } else if (lastMessage.content) {
                                 lastMessageText = lastMessage.content;
                             }
@@ -837,6 +975,7 @@ class REonikaMessenger {
                 .eq('chat_id', chatId)
                 .eq('is_read', false)
                 .is('is_deleted', false)
+                .gt('expires_at', new Date().toISOString()) // Только не истекшие сообщения
                 .neq('sender_id', this.currentUser.id);
 
             if (error) {
@@ -861,7 +1000,8 @@ class REonikaMessenger {
                 .eq('chat_id', chatId)
                 .neq('sender_id', this.currentUser.id)
                 .eq('is_read', false)
-                .is('is_deleted', false);
+                .is('is_deleted', false)
+                .gt('expires_at', new Date().toISOString()); // Только не истекшие сообщения
 
             if (error) {
                 console.error('Error marking messages as read:', error);
@@ -894,10 +1034,14 @@ class REonikaMessenger {
             const chatHeader = document.getElementById('chat-header');
             const chatInputContainer = document.getElementById('chat-input-container');
             const noChatSelected = document.querySelector('.no-chat-selected');
+            const chatArea = document.getElementById('chat-area');
             
             if (chatHeader) chatHeader.style.display = 'flex';
             if (chatInputContainer) chatInputContainer.style.display = 'flex';
             if (noChatSelected) noChatSelected.style.display = 'none';
+            if (this.isMobile && chatArea) {
+                chatArea.classList.add('chat-active');
+            }
             
             this.hideSearchResults();
             
@@ -911,12 +1055,10 @@ class REonikaMessenger {
         try {
             const { data, error } = await supabase
                 .from('messages')
-                .select(`
-                    *,
-                    sender:profiles(*)
-                `)
+                .select(`*, sender:profiles(*)`)
                 .eq('chat_id', chatId)
                 .is('is_deleted', false)
+                .gt('expires_at', new Date().toISOString()) // Только не истекшие сообщения
                 .order('created_at', { ascending: true });
 
             if (error) {
@@ -927,9 +1069,6 @@ class REonikaMessenger {
 
             this.messages = data || [];
             this.renderMessages();
-            
-            // Обновляем для мобильных
-            this.updateChatInputForMobile();
             
         } catch (error) {
             console.error('Load messages exception:', error);
@@ -970,6 +1109,7 @@ class REonikaMessenger {
                         sender_id: this.currentUser.id,
                         content: text,
                         created_at: new Date().toISOString(),
+                        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 часа
                         is_read: false
                     }
                 ])
@@ -1007,114 +1147,6 @@ class REonikaMessenger {
             console.error('Send message exception:', error);
             this.showNotification('Неизвестная ошибка при отправке сообщения', 'error');
         }
-    }
-
-    // Мобильная адаптация для поля ввода
-    updateChatInputForMobile() {
-        const chatInputContainer = document.getElementById('chat-input-container');
-        const messageInput = document.getElementById('message-input');
-        const sendBtn = document.getElementById('send-btn');
-        
-        if (!this.isMobile || !chatInputContainer || !sendBtn) return;
-        
-        // Перемещаем кнопку отправки в контейнер
-        chatInputContainer.style.padding = '12px';
-        chatInputContainer.style.gap = '8px';
-        
-        // Уменьшаем кнопку отправки
-        sendBtn.style.padding = '12px 16px';
-        sendBtn.style.minWidth = 'auto';
-        sendBtn.style.flexShrink = '0';
-        
-        // Настраиваем поле ввода
-        if (messageInput) {
-            messageInput.style.padding = '12px 14px';
-            messageInput.style.fontSize = '14px';
-        }
-    }
-
-    async uploadAvatar(event) {
-        const file = event.target.files[0];
-        if (!file || !this.currentUser) return;
-
-        if (file.size > 5 * 1024 * 1024) {
-            this.showNotification('Файл слишком большой (макс 5MB)', 'error');
-            return;
-        }
-
-        // Проверяем тип файла
-        const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!validTypes.includes(file.type)) {
-            this.showNotification('Недопустимый тип файла. Используйте JPG, PNG, GIF или WebP', 'error');
-            return;
-        }
-
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${this.currentUser.id}/${Date.now()}.${fileExt}`;
-
-        try {
-            // Сначала удаляем старый аватар, если он есть
-            if (this.currentUser.profile?.avatar_url) {
-                const oldFileName = this.currentUser.profile.avatar_url.split('/').pop();
-                if (oldFileName) {
-                    try {
-                        await supabase.storage
-                            .from('avatars')
-                            .remove([`${this.currentUser.id}/${oldFileName}`]);
-                    } catch (removeError) {
-                        console.warn('Could not remove old avatar:', removeError);
-                    }
-                }
-            }
-
-            // Загружаем новый аватар
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('avatars')
-                .upload(fileName, file, { 
-                    upsert: true,
-                    cacheControl: '3600'
-                });
-
-            if (uploadError) {
-                console.error('Upload error:', uploadError);
-                throw new Error(`Ошибка загрузки: ${uploadError.message}`);
-            }
-
-            // Получаем публичный URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('avatars')
-                .getPublicUrl(fileName);
-
-            // Обновляем профиль в базе данных
-            const { error: updateError } = await supabase
-                .from('profiles')
-                .update({ 
-                    avatar_url: publicUrl,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', this.currentUser.id);
-
-            if (updateError) {
-                console.error('Update error:', updateError);
-                throw new Error(`Ошибка обновления профиля: ${updateError.message}`);
-            }
-
-            // Обновляем локальные данные
-            if (this.currentUser.profile) {
-                this.currentUser.profile.avatar_url = publicUrl;
-                this.currentUser.profile.updated_at = new Date().toISOString();
-            }
-            
-            this.updateUserUI();
-            this.loadChats();
-            this.showNotification('Аватар обновлен', 'success');
-            
-        } catch (error) {
-            console.error('Error uploading avatar:', error);
-            this.showNotification(`Ошибка загрузки аватара: ${error.message}`, 'error');
-        }
-        
-        event.target.value = '';
     }
 
     async uploadImage(event) {
@@ -1180,6 +1212,7 @@ class REonikaMessenger {
                         content: '🖼️ Изображение',
                         image_url: publicUrl,
                         created_at: new Date().toISOString(),
+                        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 часа
                         is_read: false
                     }
                 ])
@@ -1205,151 +1238,729 @@ class REonikaMessenger {
         }
     }
 
-    async deleteMessage(messageId) {
-        if (!this.currentUser || !messageId) return;
-        
-        const confirmed = confirm('Удалить это сообщение?');
-        if (!confirmed) return;
-        
+    async uploadProfileAvatar(event) {
+        const file = event.target.files[0];
+        if (!file || !this.currentUser) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            this.showNotification('Файл слишком большой (макс 5MB)', 'error');
+            return;
+        }
+
+        // Проверяем тип файла
+        const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+            this.showNotification('Недопустимый тип файла. Используйте JPG, PNG, GIF или WebP', 'error');
+            return;
+        }
+
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${this.currentUser.id}/${Date.now()}.${fileExt}`;
+
         try {
-            const { error } = await supabase
-                .from('messages')
-                .update({
-                    is_deleted: true,
-                    deleted_at: new Date().toISOString(),
-                    content: 'Сообщение удалено',
-                    image_url: null
+            this.showNotification('Загрузка аватара...', 'info');
+
+            // Сначала удаляем старый аватар, если он есть
+            if (this.currentUser.profile?.avatar_url) {
+                const oldFileName = this.currentUser.profile.avatar_url.split('/').pop();
+                if (oldFileName) {
+                    try {
+                        await supabase.storage
+                            .from('avatars')
+                            .remove([`${this.currentUser.id}/${oldFileName}`]);
+                    } catch (removeError) {
+                        console.warn('Could not remove old avatar:', removeError);
+                    }
+                }
+            }
+
+            // Загружаем новый аватар
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(fileName, file, { 
+                    upsert: true,
+                    cacheControl: '3600'
+                });
+
+            if (uploadError) {
+                console.error('Upload error:', uploadError);
+                throw new Error(`Ошибка загрузки: ${uploadError.message}`);
+            }
+
+            // Получаем публичный URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(fileName);
+
+            // Обновляем профиль в базе данных
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ 
+                    avatar_url: publicUrl,
+                    updated_at: new Date().toISOString()
                 })
-                .eq('id', messageId)
-                .eq('sender_id', this.currentUser.id); // Только свои сообщения
+                .eq('id', this.currentUser.id);
+
+            if (updateError) {
+                console.error('Update error:', updateError);
+                throw new Error(`Ошибка обновления профиля: ${updateError.message}`);
+            }
+
+            // Обновляем локальные данные
+            if (this.currentUser.profile) {
+                this.currentUser.profile.avatar_url = publicUrl;
+                this.currentUser.profile.updated_at = new Date().toISOString();
+            }
+            
+            this.updateUserUI();
+            this.updateProfileUI();
+            this.loadChats();
+            this.showNotification('Аватар обновлен', 'success');
+            
+        } catch (error) {
+            console.error('Error uploading avatar:', error);
+            this.showNotification(`Ошибка загрузки аватара: ${error.message}`, 'error');
+        }
+        
+        event.target.value = '';
+    }
+
+    async saveProfile() {
+        const usernameInput = document.getElementById('profile-username');
+        const statusInput = document.getElementById('profile-status');
+        
+        const username = usernameInput ? usernameInput.value.trim() : '';
+        const status = statusInput ? statusInput.value.trim() : '';
+
+        if (!username) {
+            this.showNotification('Имя пользователя не может быть пустым', 'error');
+            return;
+        }
+
+        try {
+            const updates = {
+                username: username,
+                status: status,
+                updated_at: new Date().toISOString()
+            };
+
+            const { error } = await supabase
+                .from('profiles')
+                .update(updates)
+                .eq('id', this.currentUser.id);
 
             if (error) {
-                console.error('Error deleting message:', error);
-                this.showNotification('Ошибка удаления сообщения', 'error');
+                console.error('Error updating profile:', error);
+                this.showNotification('Ошибка сохранения профиля', 'error');
                 return;
             }
 
-            this.showNotification('Сообщение удалено', 'success');
-            
-            // Обновляем сообщения
-            if (this.currentChat) {
-                await this.loadMessages(this.currentChat.id);
+            // Обновляем локальные данные
+            if (this.currentUser.profile) {
+                this.currentUser.profile.username = username;
+                this.currentUser.profile.status = status;
+                this.currentUser.profile.updated_at = updates.updated_at;
             }
             
+            this.updateUserUI();
+            this.updateProfileUI();
+            this.loadChats();
+            this.showNotification('Профиль успешно обновлен', 'success');
+            
         } catch (error) {
-            console.error('Delete message exception:', error);
-            this.showNotification('Ошибка удаления сообщения', 'error');
+            console.error('Save profile exception:', error);
+            this.showNotification('Ошибка сохранения профиля', 'error');
         }
+    }
+
+    async changePassword() {
+        const currentPasswordInput = document.getElementById('current-password');
+        const newPasswordInput = document.getElementById('new-password');
+        const confirmPasswordInput = document.getElementById('confirm-password');
+        
+        const currentPassword = currentPasswordInput ? currentPasswordInput.value : '';
+        const newPassword = newPasswordInput ? newPasswordInput.value : '';
+        const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value : '';
+
+        if (!currentPassword) {
+            this.showNotification('Введите текущий пароль', 'error');
+            return;
+        }
+
+        if (newPassword && newPassword.length < 6) {
+            this.showNotification('Новый пароль должен быть не менее 6 символов', 'error');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            this.showNotification('Пароли не совпадают', 'error');
+            return;
+        }
+
+        try {
+            // Проверяем текущий пароль
+            const { error: authError } = await supabase.auth.signInWithPassword({
+                email: this.currentUser.email,
+                password: currentPassword
+            });
+
+            if (authError) {
+                this.showNotification('Неверный текущий пароль', 'error');
+                return;
+            }
+
+            // Меняем пароль
+            const { error: updateError } = await supabase.auth.updateUser({
+                password: newPassword || undefined
+            });
+
+            if (updateError) {
+                console.error('Error updating password:', updateError);
+                this.showNotification('Ошибка изменения пароля', 'error');
+                return;
+            }
+
+            this.showNotification('Пароль успешно изменен', 'success');
+            
+            // Очищаем поля
+            if (currentPasswordInput) currentPasswordInput.value = '';
+            if (newPasswordInput) newPasswordInput.value = '';
+            if (confirmPasswordInput) confirmPasswordInput.value = '';
+            
+        } catch (error) {
+            console.error('Change password exception:', error);
+            this.showNotification('Ошибка изменения пароля', 'error');
+        }
+    }
+
+    // Удаление контакта из списка
+    async deleteContact(chatId) {
+        if (!this.currentUser) return;
+        
+        this.showConfirmModal(
+            'Удалить контакт?',
+            'Это действие удалит чат и все сообщения с этим пользователем. Это действие нельзя отменить.',
+            'error',
+            async () => {
+                try {
+                    // Помечаем чат как удаленный
+                    const { error: chatError } = await supabase
+                        .from('chats')
+                        .update({
+                            is_deleted: true,
+                            deleted_at: new Date().toISOString()
+                        })
+                        .eq('id', chatId);
+
+                    if (chatError) {
+                        console.error('Error deleting chat:', chatError);
+                        this.showNotification('Ошибка удаления контакта', 'error');
+                        return;
+                    }
+
+                    // Если удаленный чат был активным, сбрасываем текущий чат
+                    if (this.currentChat && this.currentChat.id === chatId) {
+                        this.currentChat = null;
+                        this.updateChatUI();
+                        
+                        // Скрываем интерфейс чата
+                        const chatHeader = document.getElementById('chat-header');
+                        const chatInputContainer = document.getElementById('chat-input-container');
+                        const noChatSelected = document.querySelector('.no-chat-selected');
+                        const messagesContainer = document.getElementById('messages-container');
+                        const chatArea = document.getElementById('chat-area');
+                        
+                        if (chatHeader) chatHeader.style.display = 'none';
+                        if (chatInputContainer) chatInputContainer.style.display = 'none';
+                        if (noChatSelected) noChatSelected.style.display = 'flex';
+                        if (messagesContainer) messagesContainer.innerHTML = `
+                            <div class="no-chat-selected">
+                                <i class="fas fa-comments"></i>
+                                <p>Выберите чат для начала общения</p>
+                            </div>
+                        `;
+                        if (this.isMobile && chatArea) {
+                            chatArea.classList.remove('chat-active');
+                        }
+                    }
+
+                    this.showNotification('Контакт удален', 'success');
+                    
+                    // Обновляем список чатов
+                    await this.loadChats();
+                    
+                } catch (error) {
+                    console.error('Delete contact exception:', error);
+                    this.showNotification('Ошибка удаления контакта', 'error');
+                }
+            }
+        );
+    }
+
+    async deleteMessage(messageId) {
+        if (!this.currentUser || !messageId) return;
+        
+        this.showConfirmModal(
+            'Удалить сообщение?',
+            'Это действие нельзя отменить.',
+            'warning',
+            async () => {
+                try {
+                    const { error } = await supabase
+                        .from('messages')
+                        .update({
+                            is_deleted: true,
+                            deleted_at: new Date().toISOString(),
+                            content: 'Сообщение удалено',
+                            image_url: null,
+                            voice_url: null
+                        })
+                        .eq('id', messageId)
+                        .eq('sender_id', this.currentUser.id); // Только свои сообщения
+
+                    if (error) {
+                        console.error('Error deleting message:', error);
+                        this.showNotification('Ошибка удаления сообщения', 'error');
+                        return;
+                    }
+
+                    this.showNotification('Сообщение удалено', 'success');
+                    
+                    // Обновляем сообщения
+                    if (this.currentChat) {
+                        await this.loadMessages(this.currentChat.id);
+                    }
+                    
+                } catch (error) {
+                    console.error('Delete message exception:', error);
+                    this.showNotification('Ошибка удаления сообщения', 'error');
+                }
+            }
+        );
     }
 
     async deleteChat() {
         if (!this.currentChat || !this.currentUser) return;
         
-        const confirmed = confirm('Удалить этот чат? Все сообщения будут удалены.');
-        if (!confirmed) return;
+        this.showConfirmModal(
+            'Удалить чат?',
+            'Все сообщения в этом чате будут удалены. Это действие нельзя отменить.',
+            'error',
+            async () => {
+                try {
+                    const { error } = await supabase
+                        .from('chats')
+                        .update({
+                            is_deleted: true,
+                            deleted_at: new Date().toISOString()
+                        })
+                        .eq('id', this.currentChat.id);
+
+                    if (error) {
+                        console.error('Error deleting chat:', error);
+                        this.showNotification('Ошибка удаления чата', 'error');
+                        return;
+                    }
+
+                    this.showNotification('Чат удален', 'success');
+                    
+                    // Сбрасываем текущий чат
+                    this.currentChat = null;
+                    
+                    // Обновляем список чатов
+                    await this.loadChats();
+                    
+                    // Скрываем интерфейс чата
+                    const chatHeader = document.getElementById('chat-header');
+                    const chatInputContainer = document.getElementById('chat-input-container');
+                    const noChatSelected = document.querySelector('.no-chat-selected');
+                    const messagesContainer = document.getElementById('messages-container');
+                    const chatArea = document.getElementById('chat-area');
+                    
+                    if (chatHeader) chatHeader.style.display = 'none';
+                    if (chatInputContainer) chatInputContainer.style.display = 'none';
+                    if (noChatSelected) noChatSelected.style.display = 'flex';
+                    if (messagesContainer) messagesContainer.innerHTML = `
+                        <div class="no-chat-selected">
+                            <i class="fas fa-comments"></i>
+                            <p>Выберите чат для начала общения</p>
+                        </div>
+                    `;
+                    if (this.isMobile && chatArea) {
+                        chatArea.classList.remove('chat-active');
+                    }
+                    
+                } catch (error) {
+                    console.error('Delete chat exception:', error);
+                    this.showNotification('Ошибка удаления чата', 'error');
+                }
+            }
+        );
+    }
+
+    showDeleteAccountConfirm() {
+        this.showConfirmModal(
+            'Удалить аккаунт?',
+            'ВНИМАНИЕ: Вы удаляете свой аккаунт. Это действие нельзя отменить. Все ваши данные будут удалены.',
+            'error',
+            async () => {
+                const password = prompt('Введите ваш пароль для подтверждения:');
+                if (!password) return;
+                
+                try {
+                    // Проверяем пароль
+                    const { error: authError } = await supabase.auth.signInWithPassword({
+                        email: this.currentUser.email,
+                        password: password
+                    });
+                    
+                    if (authError) {
+                        this.showNotification('Неверный пароль', 'error');
+                        return;
+                    }
+                    
+                    // Удаляем профиль
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .delete()
+                        .eq('id', this.currentUser.id);
+                    
+                    if (profileError) {
+                        console.error('Error deleting profile:', profileError);
+                    }
+                    
+                    // Удаляем аватар из Storage
+                    try {
+                        await supabase.storage
+                            .from('avatars')
+                            .remove([`${this.currentUser.id}/`]);
+                    } catch (storageError) {
+                        console.warn('Error deleting avatar:', storageError);
+                    }
+                    
+                    // Удаляем пользователя из Auth
+                    const { error: signOutError } = await supabase.auth.signOut();
+                    if (signOutError) {
+                        console.error('Error signing out:', signOutError);
+                    }
+                    
+                    this.showNotification('Аккаунт удален', 'success');
+                    
+                    // Перезагружаем страницу
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                    
+                } catch (error) {
+                    console.error('Delete account exception:', error);
+                    this.showNotification('Ошибка удаления аккаунта', 'error');
+                }
+            }
+        );
+    }
+
+    // Голосовые сообщения
+    async startVoiceRecording() {
+        if (this.isRecording) return;
         
         try {
-            const { error } = await supabase
-                .from('chats')
-                .update({
-                    is_deleted: true,
-                    deleted_at: new Date().toISOString()
-                })
-                .eq('id', this.currentChat.id);
-
-            if (error) {
-                console.error('Error deleting chat:', error);
-                this.showNotification('Ошибка удаления чата', 'error');
-                return;
-            }
-
-            this.showNotification('Чат удален', 'success');
+            // Запрашиваем доступ к микрофону
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 44100
+                }
+            });
             
-            // Сбрасываем текущий чат
-            this.currentChat = null;
+            this.mediaRecorder = new MediaRecorder(stream);
+            this.audioChunks = [];
             
-            // Обновляем список чатов
-            await this.loadChats();
+            // Собираем аудио данные
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                }
+            };
             
-            // Скрываем интерфейс чата
-            const chatHeader = document.getElementById('chat-header');
-            const chatInputContainer = document.getElementById('chat-input-container');
-            const noChatSelected = document.querySelector('.no-chat-selected');
-            const messagesContainer = document.getElementById('messages-container');
+            // При окончании записи
+            this.mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                await this.sendVoiceMessage(audioBlob);
+                
+                // Останавливаем все треки
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Скрываем индикатор записи
+                this.hideRecordingIndicator();
+            };
             
-            if (chatHeader) chatHeader.style.display = 'none';
-            if (chatInputContainer) chatInputContainer.style.display = 'none';
-            if (noChatSelected) noChatSelected.style.display = 'flex';
-            if (messagesContainer) messagesContainer.innerHTML = `
-                <div class="no-chat-selected">
-                    <i class="fas fa-comments"></i>
-                    <p>Выберите чат для начала общения</p>
-                </div>
-            `;
+            // Запускаем запись
+            this.mediaRecorder.start(100); // Собираем данные каждые 100мс
+            this.isRecording = true;
+            this.recordingStartTime = Date.now();
+            
+            // Показываем индикатор записи
+            this.showRecordingIndicator();
+            
+            // Запускаем таймер
+            this.startRecordingTimer();
             
         } catch (error) {
-            console.error('Delete chat exception:', error);
-            this.showNotification('Ошибка удаления чата', 'error');
+            console.error('Error starting voice recording:', error);
+            this.showNotification('Не удалось получить доступ к микрофону', 'error');
         }
     }
 
-    async deleteAccount() {
-        if (!this.currentUser) return;
+    stopVoiceRecording() {
+        if (!this.isRecording || !this.mediaRecorder) return;
         
-        const password = prompt('Введите ваш пароль для подтверждения удаления аккаунта:');
-        if (!password) return;
+        // Останавливаем запись
+        if (this.mediaRecorder.state !== 'inactive') {
+            this.mediaRecorder.stop();
+        }
         
-        const confirmed = confirm('ВНИМАНИЕ: Вы удаляете свой аккаунт. Это действие нельзя отменить. Все ваши данные будут удалены.');
-        if (!confirmed) return;
+        this.isRecording = false;
         
+        // Останавливаем таймер
+        if (this.recordingTimer) {
+            clearInterval(this.recordingTimer);
+            this.recordingTimer = null;
+        }
+    }
+
+    showRecordingIndicator() {
+        // Создаем индикатор записи
+        const indicator = document.createElement('div');
+        indicator.className = 'voice-recording-indicator';
+        indicator.id = 'voice-recording-indicator';
+        indicator.innerHTML = `
+            <i class="fas fa-microphone"></i>
+            <div class="voice-recording-timer" id="recording-timer">00:00</div>
+            <div class="voice-recording-hint">Отпустите кнопку, чтобы отправить голосовое сообщение</div>
+        `;
+        
+        document.body.appendChild(indicator);
+    }
+
+    hideRecordingIndicator() {
+        const indicator = document.getElementById('voice-recording-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+
+    startRecordingTimer() {
+        this.recordingTimer = setInterval(() => {
+            if (!this.recordingStartTime) return;
+            
+            const elapsed = Date.now() - this.recordingStartTime;
+            const seconds = Math.floor(elapsed / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            
+            const timerElement = document.getElementById('recording-timer');
+            if (timerElement) {
+                timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }
+            
+            // Автоматически останавливаем запись после 2 минут
+            if (seconds >= 120) {
+                this.stopVoiceRecording();
+            }
+        }, 1000);
+    }
+
+    async sendVoiceMessage(audioBlob) {
+        if (!this.currentChat || !this.currentUser) return;
+        
+        // Проверяем, является ли пользователь участником чата
+        const isParticipant = this.currentChat.user1_id === this.currentUser.id || 
+                              this.currentChat.user2_id === this.currentUser.id;
+        
+        if (!isParticipant) {
+            this.showNotification('Вы не участник этого чата', 'error');
+            return;
+        }
+
+        if (audioBlob.size === 0) {
+            this.showNotification('Запись слишком короткая', 'error');
+            return;
+        }
+
+        const fileName = `${this.currentUser.id}/${Date.now()}.webm`;
+
         try {
-            // Проверяем пароль
-            const { error: authError } = await supabase.auth.signInWithPassword({
-                email: this.currentUser.email,
-                password: password
-            });
-            
-            if (authError) {
-                this.showNotification('Неверный пароль', 'error');
-                return;
+            this.showNotification('Отправка голосового сообщения...', 'info');
+
+            // Загружаем аудиофайл
+            const { error: uploadError } = await supabase.storage
+                .from('voice_messages')
+                .upload(fileName, audioBlob, {
+                    cacheControl: '3600',
+                    upsert: false,
+                    contentType: 'audio/webm'
+                });
+
+            if (uploadError) {
+                console.error('Upload error:', uploadError);
+                throw new Error(`Ошибка загрузки: ${uploadError.message}`);
             }
+
+            // Получаем публичный URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('voice_messages')
+                .getPublicUrl(fileName);
+
+            // Получаем длительность аудио
+            const audio = new Audio();
+            audio.src = URL.createObjectURL(audioBlob);
             
-            // Удаляем профиль
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .delete()
-                .eq('id', this.currentUser.id);
-            
-            if (profileError) {
-                console.error('Error deleting profile:', profileError);
-            }
-            
-            // Удаляем аватар из Storage
-            try {
-                await supabase.storage
-                    .from('avatars')
-                    .remove([`${this.currentUser.id}/`]);
-            } catch (storageError) {
-                console.warn('Error deleting avatar:', storageError);
-            }
-            
-            // Удаляем пользователя из Auth
-            const { error: signOutError } = await supabase.auth.signOut();
-            if (signOutError) {
-                console.error('Error signing out:', signOutError);
-            }
-            
-            this.showNotification('Аккаунт удален', 'success');
-            
-            // Перезагружаем страницу
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
+            audio.onloadedmetadata = async () => {
+                const duration = Math.round(audio.duration);
+                
+                // Создаем сообщение
+                const { error: messageError } = await supabase
+                    .from('messages')
+                    .insert([
+                        {
+                            chat_id: this.currentChat.id,
+                            sender_id: this.currentUser.id,
+                            content: '🎤 Голосовое сообщение',
+                            voice_url: publicUrl,
+                            voice_duration: duration,
+                            created_at: new Date().toISOString(),
+                            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 часа
+                            is_read: false
+                        }
+                    ]);
+
+                if (messageError) {
+                    console.error('Message insert error:', messageError);
+                    throw new Error(`Ошибка сохранения сообщения: ${messageError.message}`);
+                }
+
+                this.showNotification('Голосовое сообщение отправлено', 'success');
+                
+                // Освобождаем URL
+                URL.revokeObjectURL(audio.src);
+                
+                // Немедленно обновляем сообщения
+                await this.loadMessages(this.currentChat.id);
+            };
             
         } catch (error) {
-            console.error('Delete account exception:', error);
-            this.showNotification('Ошибка удаления аккаунта', 'error');
+            console.error('Error sending voice message:', error);
+            this.showNotification(`Ошибка отправки голосового сообщения: ${error.message}`, 'error');
         }
+    }
+
+    playVoiceMessage(url, button) {
+        if (this.voiceMessages.has(url)) {
+            // Останавливаем текущее воспроизведение
+            const audio = this.voiceMessages.get(url);
+            if (audio.paused) {
+                audio.play();
+                button.innerHTML = '<i class="fas fa-pause"></i>';
+                button.classList.add('playing');
+            } else {
+                audio.pause();
+                button.innerHTML = '<i class="fas fa-play"></i>';
+                button.classList.remove('playing');
+            }
+            return;
+        }
+
+        // Создаем новый аудио элемент
+        const audio = new Audio(url);
+        this.voiceMessages.set(url, audio);
+        
+        button.innerHTML = '<i class="fas fa-pause"></i>';
+        button.classList.add('playing');
+        
+        audio.addEventListener('ended', () => {
+            button.innerHTML = '<i class="fas fa-play"></i>';
+            button.classList.remove('playing');
+        });
+        
+        audio.addEventListener('pause', () => {
+            button.innerHTML = '<i class="fas fa-play"></i>';
+            button.classList.remove('playing');
+        });
+        
+        audio.play();
+    }
+
+    // Автоматическое удаление старых сообщений
+    async cleanupOldMessages() {
+        if (!this.currentUser) return;
+        
+        try {
+            // Удаляем сообщения, которым больше 24 часов
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            
+            const { error } = await supabase
+                .from('messages')
+                .delete()
+                .lt('expires_at', twentyFourHoursAgo)
+                .neq('sender_id', this.currentUser.id); // Не удаляем свои сообщения сразу
+
+            if (error) {
+                console.error('Error cleaning up old messages:', error);
+            }
+            
+        } catch (error) {
+            console.error('Cleanup old messages exception:', error);
+        }
+    }
+
+    startAutoCleanup() {
+        // Запускаем очистку каждые 5 минут
+        setInterval(() => {
+            this.cleanupOldMessages();
+        }, 5 * 60 * 1000);
+        
+        // Также запускаем при загрузке
+        this.cleanupOldMessages();
+    }
+
+    showConfirmModal(title, message, type = 'error', confirmCallback) {
+        const modal = document.getElementById('confirm-modal');
+        const modalTitle = document.getElementById('confirm-modal-title');
+        const modalMessage = document.getElementById('confirm-modal-message');
+        const confirmBtn = document.getElementById('confirm-modal-confirm');
+        
+        if (modal && modalTitle && modalMessage && confirmBtn) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            
+            // Сохраняем callback в data-атрибуте
+            confirmBtn.dataset.callback = 'temp';
+            window.tempConfirmCallback = confirmCallback;
+            
+            // Устанавливаем цвет кнопки в зависимости от типа
+            confirmBtn.className = 'confirm-modal-confirm';
+            if (type === 'warning') {
+                confirmBtn.classList.add('warning');
+            }
+            
+            modal.classList.remove('hidden');
+        }
+    }
+
+    hideConfirmModal() {
+        const modal = document.getElementById('confirm-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    handleConfirmAction() {
+        if (window.tempConfirmCallback) {
+            window.tempConfirmCallback();
+            delete window.tempConfirmCallback;
+        }
+        this.hideConfirmModal();
     }
 
     updateUserUI() {
@@ -1384,7 +1995,7 @@ class REonikaMessenger {
         const navUsername = document.getElementById('nav-username');
         if (navUsername) navUsername.textContent = profile.username;
         
-        // Обновляем основной аватар
+        // Обновляем основной аватар в чатах
         const currentUserAvatar = document.getElementById('current-user-avatar');
         if (currentUserAvatar) {
             currentUserAvatar.innerHTML = '';
@@ -1406,24 +2017,68 @@ class REonikaMessenger {
             }
         }
         
-        // Обновляем имя
+        // Обновляем имя в чатах
         const currentUserName = document.getElementById('current-user-name');
         if (currentUserName) currentUserName.textContent = profile.username;
         
-        // Обновляем email
-        const currentUserEmail = document.getElementById('current-user-email');
-        if (currentUserEmail) currentUserEmail.textContent = profile.email;
-        
-        // Обновляем дату обновления
-        const currentUserUpdated = document.getElementById('current-user-updated');
-        if (currentUserUpdated && profile.updated_at) {
-            const updatedDate = new Date(profile.updated_at);
-            currentUserUpdated.textContent = `Обновлено: ${updatedDate.toLocaleDateString('ru-RU')}`;
+        // Обновляем статус в чатах
+        const currentUserStatus = document.getElementById('current-user-status');
+        if (currentUserStatus) {
+            currentUserStatus.textContent = profile.status || 'Привет! Я использую REonika';
         }
     }
 
+    updateProfileUI() {
+        if (!this.currentUser?.profile) return;
+        
+        const profile = this.currentUser.profile;
+        
+        // Обновляем аватар в профиле
+        const profileAvatar = document.getElementById('profile-avatar');
+        if (profileAvatar) {
+            profileAvatar.innerHTML = '';
+            if (profile.avatar_url) {
+                const img = document.createElement('img');
+                img.src = profile.avatar_url;
+                img.alt = profile.username;
+                img.className = 'profile-avatar';
+                img.onerror = () => {
+                    profileAvatar.textContent = profile.username.charAt(0).toUpperCase();
+                    profileAvatar.className = 'avatar large';
+                };
+                profileAvatar.appendChild(img);
+            } else {
+                profileAvatar.className = 'avatar large';
+                profileAvatar.textContent = profile.username.charAt(0).toUpperCase();
+                profileAvatar.style.backgroundColor = '#4a5568';
+                profileAvatar.style.color = '#fff';
+                profileAvatar.style.fontSize = '42px';
+                profileAvatar.style.fontWeight = 'bold';
+            }
+        }
+        
+        // Обновляем поля формы
+        const usernameInput = document.getElementById('profile-username');
+        const emailInput = document.getElementById('profile-email');
+        const statusInput = document.getElementById('profile-status');
+        
+        if (usernameInput) usernameInput.value = profile.username || '';
+        if (emailInput) emailInput.value = profile.email || '';
+        if (statusInput) statusInput.value = profile.status || '';
+    }
+
     updateChatUI() {
-        if (!this.currentChat || !this.currentUser) return;
+        if (!this.currentChat || !this.currentUser) {
+            // Скрываем интерфейс чата, если нет активного чата
+            const chatHeader = document.getElementById('chat-header');
+            const chatInputContainer = document.getElementById('chat-input-container');
+            const noChatSelected = document.querySelector('.no-chat-selected');
+            
+            if (chatHeader) chatHeader.style.display = 'none';
+            if (chatInputContainer) chatInputContainer.style.display = 'none';
+            if (noChatSelected) noChatSelected.style.display = 'flex';
+            return;
+        }
 
         const partner = this.currentChat.user1_id === this.currentUser.id 
             ? this.currentChat.user2 
@@ -1454,25 +2109,8 @@ class REonikaMessenger {
             }
         }
         
-        // Добавляем кнопку удаления чата в заголовок
-        const chatHeader = document.getElementById('chat-header');
-        if (chatHeader && !chatHeader.querySelector('#delete-chat-btn')) {
-            const deleteBtn = document.createElement('button');
-            deleteBtn.id = 'delete-chat-btn';
-            deleteBtn.className = 'btn-icon tooltip';
-            deleteBtn.setAttribute('data-tooltip', 'Удалить чат');
-            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-            deleteBtn.style.marginLeft = 'auto';
-            deleteBtn.style.marginRight = '12px';
-            chatHeader.appendChild(deleteBtn);
-            
-            deleteBtn.addEventListener('click', () => this.deleteChat());
-        }
-        
         // Обновляем статус онлайн
         this.updateOnlineStatusUI();
-        // Обновляем для мобильных
-        this.updateChatInputForMobile();
     }
 
     renderChats() {
@@ -1525,9 +2163,28 @@ class REonikaMessenger {
                     <p class="last-message">${lastMessage}</p>
                 </div>
                 ${unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : ''}
+                <button class="delete-contact-btn" data-chat-id="${chat.id}" title="Удалить контакт">
+                    <i class="fas fa-times"></i>
+                </button>
             `;
             
-            chatItem.addEventListener('click', () => this.selectChat(chat));
+            chatItem.addEventListener('click', (e) => {
+                // Не открываем чат если кликнули на кнопку удаления
+                if (!e.target.closest('.delete-contact-btn')) {
+                    this.selectChat(chat);
+                }
+            });
+            
+            // Добавляем обработчик для кнопки удаления контакта
+            const deleteBtn = chatItem.querySelector('.delete-contact-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const chatId = deleteBtn.getAttribute('data-chat-id');
+                    this.deleteContact(chatId);
+                });
+            }
+            
             container.appendChild(chatItem);
         });
     }
@@ -1588,8 +2245,39 @@ class REonikaMessenger {
                         ${message.content !== '🖼️ Изображение' ? `<div class="message-text">${message.content}</div>` : ''}
                     </div>
                 `;
+            } else if (message.voice_url) {
+                const duration = message.voice_duration || 0;
+                const minutes = Math.floor(duration / 60);
+                const seconds = duration % 60;
+                const durationText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                content += `
+                    <div class="voice-message">
+                        <button class="play-voice-btn" data-url="${message.voice_url}">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <div class="voice-waveform"></div>
+                        <span class="voice-duration">${durationText}</span>
+                    </div>
+                `;
             } else {
                 content += `<div class="message-text">${message.content}</div>`;
+            }
+            
+            // Добавляем индикатор времени жизни сообщения
+            if (message.expires_at) {
+                const expiresDate = new Date(message.expires_at);
+                const now = new Date();
+                const hoursLeft = Math.round((expiresDate - now) / (1000 * 60 * 60));
+                
+                if (hoursLeft > 0) {
+                    content += `
+                        <div class="message-expiry">
+                            <i class="fas fa-clock"></i>
+                            <span>Удаляется через ${hoursLeft}ч</span>
+                        </div>
+                    `;
+                }
             }
             
             content += `
@@ -1610,6 +2298,17 @@ class REonikaMessenger {
                         e.stopPropagation();
                         const messageId = deleteBtn.getAttribute('data-message-id');
                         this.deleteMessage(messageId);
+                    });
+                }
+            }
+            
+            // Добавляем обработчик для голосового сообщения
+            if (message.voice_url && !isDeleted) {
+                const playBtn = messageDiv.querySelector('.play-voice-btn');
+                if (playBtn) {
+                    playBtn.addEventListener('click', () => {
+                        const url = playBtn.getAttribute('data-url');
+                        this.playVoiceMessage(url, playBtn);
                     });
                 }
             }
@@ -1749,21 +2448,6 @@ class REonikaMessenger {
         if (mainScreen) {
             mainScreen.style.display = 'block';
             mainScreen.classList.remove('hidden');
-        }
-        
-        // Добавляем кнопку удаления аккаунта
-        const navLinks = document.querySelector('.nav-links');
-        if (navLinks && !navLinks.querySelector('#delete-account-btn')) {
-            const deleteAccountBtn = document.createElement('button');
-            deleteAccountBtn.id = 'delete-account-btn';
-            deleteAccountBtn.className = 'btn-secondary';
-            deleteAccountBtn.style.backgroundColor = 'var(--error)';
-            deleteAccountBtn.style.color = 'white';
-            deleteAccountBtn.style.marginLeft = '12px';
-            deleteAccountBtn.innerHTML = '<i class="fas fa-user-slash"></i> Удалить аккаунт';
-            navLinks.insertBefore(deleteAccountBtn, navLinks.querySelector('#logout-btn'));
-            
-            deleteAccountBtn.addEventListener('click', () => this.deleteAccount());
         }
     }
 }
