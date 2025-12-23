@@ -32,7 +32,19 @@ class REonikaMessenger {
         
         // Запускаем ежедневную очистку старых сообщений
         this.startAutoCleanup();
+
+    // В конце конструктора REonikaMessenger (после this.startAutoCleanup())
+        setTimeout(() => {
+            // Инициализируем мобильные улучшения если они загружены
+            if (window.mobileEnhancements) {
+                console.log('Мобильные улучшения интегрированы');
+            }
+        }, 500);
+
     }
+
+
+    
 
     initEventListeners() {
         // Авторизация
