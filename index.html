@@ -82,6 +82,7 @@
                         <div class="avatar" id="nav-avatar"></div>
                         <span id="nav-username">Пользователь</span>
                     </div>
+                    <!-- Кнопка удаления аккаунта будет добавлена динамически -->
                     <button id="logout-btn" class="btn-primary">
                         <i class="fas fa-sign-out-alt"></i> Выйти
                     </button>
@@ -129,6 +130,7 @@
                                 </span>
                             </div>
                         </div>
+                        <!-- Кнопка удаления чата будет добавлена динамически -->
                     </div>
                     
                     <div class="chat-messages" id="messages-container">
@@ -166,6 +168,20 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="supabase.js"></script>
     <script type="module" src="app.js"></script>
+    
+    <script>
+        // Проверка поддержки всех необходимых функций
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!window.indexedDB) {
+                alert('Ваш браузер не поддерживает IndexedDB. Некоторые функции могут работать некорректно.');
+            }
+            
+            if (!window.Notification || !('serviceWorker' in navigator)) {
+                console.warn('Уведомления и офлайн-режим недоступны в этом браузере');
+            }
+        });
+    </script>
 </body>
 </html>

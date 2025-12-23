@@ -11,8 +11,14 @@ class REonikaMessenger {
         this.searchTimeout = null;
         this.updateInterval = null;
         this.realtimeSubscriptions = [];
+        this.isMobile = window.innerWidth <= 768;
+        
         this.initEventListeners();
         this.checkAuth();
+        
+        window.addEventListener('resize', () => {
+            this.isMobile = window.innerWidth <= 768;
+        });
     }
 
     initEventListeners() {
@@ -41,6 +47,12 @@ class REonikaMessenger {
         
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) logoutBtn.addEventListener('click', () => this.logout());
+
+        // Удаление аккаунта
+        const deleteAccountBtn = document.getElementById('delete-account-btn');
+        if (deleteAccountBtn) {
+            deleteAccountBtn.addEventListener('click', () => this.deleteAccount());
+        }
 
         // Поиск пользователей с автоопределением
         const searchUserBtn = document.getElementById('search-user-btn');
@@ -309,7 +321,7 @@ class REonikaMessenger {
                     this.loadMessages(this.currentChat.id);
                 }
             }
-        }, 30000); // Обновляем каждые 30 секунд
+        }, 30000);
     }
 
     async updateOnlineStatus(isOnline) {
@@ -687,6 +699,7 @@ class REonikaMessenger {
                 .from('chats')
                 .select('*, user1:profiles!chats_user1_id_fkey(*), user2:profiles!chats_user2_id_fkey(*)')
                 .or(`and(user1_id.eq.${this.currentUser.id},user2_id.eq.${otherUserId}),and(user1_id.eq.${otherUserId},user2_id.eq.${this.currentUser.id})`)
+                .is('is_deleted', false)
                 .single();
 
             if (error && error.code !== 'PGRST116') {
@@ -722,7 +735,7 @@ class REonikaMessenger {
             if (error) {
                 console.error('Create chat error details:', error);
                 
-                if (error.code === '23505') { // Unique violation
+                if (error.code === '23505') {
                     // Чат уже существует, находим его
                     const existingChat = await this.findChatWithUser(otherUserId);
                     if (existingChat) {
@@ -755,6 +768,7 @@ class REonikaMessenger {
                 .from('chats')
                 .select('*, user1:profiles!chats_user1_id_fkey(*), user2:profiles!chats_user2_id_fkey(*)')
                 .or(`user1_id.eq.${this.currentUser.id},user2_id.eq.${this.currentUser.id}`)
+                .is('is_deleted', false)
                 .order('updated_at', { ascending: false });
 
             if (error) {
@@ -769,6 +783,7 @@ class REonikaMessenger {
                             .from('messages')
                             .select('content, created_at, image_url, sender_id')
                             .eq('chat_id', chat.id)
+                            .is('is_deleted', false)
                             .order('created_at', { ascending: false })
                             .limit(1)
                             .single();
@@ -821,6 +836,7 @@ class REonikaMessenger {
                 .select('*', { count: 'exact', head: true })
                 .eq('chat_id', chatId)
                 .eq('is_read', false)
+                .is('is_deleted', false)
                 .neq('sender_id', this.currentUser.id);
 
             if (error) {
@@ -844,7 +860,8 @@ class REonikaMessenger {
                 .update({ is_read: true, read_at: new Date().toISOString() })
                 .eq('chat_id', chatId)
                 .neq('sender_id', this.currentUser.id)
-                .eq('is_read', false);
+                .eq('is_read', false)
+                .is('is_deleted', false);
 
             if (error) {
                 console.error('Error marking messages as read:', error);
@@ -899,6 +916,7 @@ class REonikaMessenger {
                     sender:profiles(*)
                 `)
                 .eq('chat_id', chatId)
+                .is('is_deleted', false)
                 .order('created_at', { ascending: true });
 
             if (error) {
@@ -909,6 +927,9 @@ class REonikaMessenger {
 
             this.messages = data || [];
             this.renderMessages();
+            
+            // Обновляем для мобильных
+            this.updateChatInputForMobile();
             
         } catch (error) {
             console.error('Load messages exception:', error);
@@ -952,13 +973,12 @@ class REonikaMessenger {
                         is_read: false
                     }
                 ])
-                .select('*') // Возвращаем вставленные данные
+                .select('*')
                 .single();
 
             if (error) {
                 console.error('Send message error details:', error);
                 
-                // Более подробные сообщения об ошибках
                 if (error.code === '42501') {
                     this.showNotification('Нет прав для отправки сообщения в этот чат', 'error');
                 } else if (error.code === '23503') {
@@ -986,6 +1006,30 @@ class REonikaMessenger {
         } catch (error) {
             console.error('Send message exception:', error);
             this.showNotification('Неизвестная ошибка при отправке сообщения', 'error');
+        }
+    }
+
+    // Мобильная адаптация для поля ввода
+    updateChatInputForMobile() {
+        const chatInputContainer = document.getElementById('chat-input-container');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        
+        if (!this.isMobile || !chatInputContainer || !sendBtn) return;
+        
+        // Перемещаем кнопку отправки в контейнер
+        chatInputContainer.style.padding = '12px';
+        chatInputContainer.style.gap = '8px';
+        
+        // Уменьшаем кнопку отправки
+        sendBtn.style.padding = '12px 16px';
+        sendBtn.style.minWidth = 'auto';
+        sendBtn.style.flexShrink = '0';
+        
+        // Настраиваем поле ввода
+        if (messageInput) {
+            messageInput.style.padding = '12px 14px';
+            messageInput.style.fontSize = '14px';
         }
     }
 
@@ -1062,7 +1106,7 @@ class REonikaMessenger {
             }
             
             this.updateUserUI();
-            this.loadChats(); // Обновляем чаты, чтобы везде отобразился новый аватар
+            this.loadChats();
             this.showNotification('Аватар обновлен', 'success');
             
         } catch (error) {
@@ -1158,6 +1202,153 @@ class REonikaMessenger {
             this.showNotification(`Ошибка загрузки изображения: ${error.message}`, 'error');
         } finally {
             event.target.value = '';
+        }
+    }
+
+    async deleteMessage(messageId) {
+        if (!this.currentUser || !messageId) return;
+        
+        const confirmed = confirm('Удалить это сообщение?');
+        if (!confirmed) return;
+        
+        try {
+            const { error } = await supabase
+                .from('messages')
+                .update({
+                    is_deleted: true,
+                    deleted_at: new Date().toISOString(),
+                    content: 'Сообщение удалено',
+                    image_url: null
+                })
+                .eq('id', messageId)
+                .eq('sender_id', this.currentUser.id); // Только свои сообщения
+
+            if (error) {
+                console.error('Error deleting message:', error);
+                this.showNotification('Ошибка удаления сообщения', 'error');
+                return;
+            }
+
+            this.showNotification('Сообщение удалено', 'success');
+            
+            // Обновляем сообщения
+            if (this.currentChat) {
+                await this.loadMessages(this.currentChat.id);
+            }
+            
+        } catch (error) {
+            console.error('Delete message exception:', error);
+            this.showNotification('Ошибка удаления сообщения', 'error');
+        }
+    }
+
+    async deleteChat() {
+        if (!this.currentChat || !this.currentUser) return;
+        
+        const confirmed = confirm('Удалить этот чат? Все сообщения будут удалены.');
+        if (!confirmed) return;
+        
+        try {
+            const { error } = await supabase
+                .from('chats')
+                .update({
+                    is_deleted: true,
+                    deleted_at: new Date().toISOString()
+                })
+                .eq('id', this.currentChat.id);
+
+            if (error) {
+                console.error('Error deleting chat:', error);
+                this.showNotification('Ошибка удаления чата', 'error');
+                return;
+            }
+
+            this.showNotification('Чат удален', 'success');
+            
+            // Сбрасываем текущий чат
+            this.currentChat = null;
+            
+            // Обновляем список чатов
+            await this.loadChats();
+            
+            // Скрываем интерфейс чата
+            const chatHeader = document.getElementById('chat-header');
+            const chatInputContainer = document.getElementById('chat-input-container');
+            const noChatSelected = document.querySelector('.no-chat-selected');
+            const messagesContainer = document.getElementById('messages-container');
+            
+            if (chatHeader) chatHeader.style.display = 'none';
+            if (chatInputContainer) chatInputContainer.style.display = 'none';
+            if (noChatSelected) noChatSelected.style.display = 'flex';
+            if (messagesContainer) messagesContainer.innerHTML = `
+                <div class="no-chat-selected">
+                    <i class="fas fa-comments"></i>
+                    <p>Выберите чат для начала общения</p>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Delete chat exception:', error);
+            this.showNotification('Ошибка удаления чата', 'error');
+        }
+    }
+
+    async deleteAccount() {
+        if (!this.currentUser) return;
+        
+        const password = prompt('Введите ваш пароль для подтверждения удаления аккаунта:');
+        if (!password) return;
+        
+        const confirmed = confirm('ВНИМАНИЕ: Вы удаляете свой аккаунт. Это действие нельзя отменить. Все ваши данные будут удалены.');
+        if (!confirmed) return;
+        
+        try {
+            // Проверяем пароль
+            const { error: authError } = await supabase.auth.signInWithPassword({
+                email: this.currentUser.email,
+                password: password
+            });
+            
+            if (authError) {
+                this.showNotification('Неверный пароль', 'error');
+                return;
+            }
+            
+            // Удаляем профиль
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .delete()
+                .eq('id', this.currentUser.id);
+            
+            if (profileError) {
+                console.error('Error deleting profile:', profileError);
+            }
+            
+            // Удаляем аватар из Storage
+            try {
+                await supabase.storage
+                    .from('avatars')
+                    .remove([`${this.currentUser.id}/`]);
+            } catch (storageError) {
+                console.warn('Error deleting avatar:', storageError);
+            }
+            
+            // Удаляем пользователя из Auth
+            const { error: signOutError } = await supabase.auth.signOut();
+            if (signOutError) {
+                console.error('Error signing out:', signOutError);
+            }
+            
+            this.showNotification('Аккаунт удален', 'success');
+            
+            // Перезагружаем страницу
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Delete account exception:', error);
+            this.showNotification('Ошибка удаления аккаунта', 'error');
         }
     }
 
@@ -1263,8 +1454,25 @@ class REonikaMessenger {
             }
         }
         
+        // Добавляем кнопку удаления чата в заголовок
+        const chatHeader = document.getElementById('chat-header');
+        if (chatHeader && !chatHeader.querySelector('#delete-chat-btn')) {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.id = 'delete-chat-btn';
+            deleteBtn.className = 'btn-icon tooltip';
+            deleteBtn.setAttribute('data-tooltip', 'Удалить чат');
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            deleteBtn.style.marginLeft = 'auto';
+            deleteBtn.style.marginRight = '12px';
+            chatHeader.appendChild(deleteBtn);
+            
+            deleteBtn.addEventListener('click', () => this.deleteChat());
+        }
+        
         // Обновляем статус онлайн
         this.updateOnlineStatusUI();
+        // Обновляем для мобильных
+        this.updateChatInputForMobile();
     }
 
     renderChats() {
@@ -1341,6 +1549,7 @@ class REonikaMessenger {
         this.messages.forEach((message, index) => {
             const isSent = message.sender_id === this.currentUser.id;
             const messageDate = new Date(message.created_at).toDateString();
+            const isDeleted = message.is_deleted;
             
             // Добавляем дату, если она изменилась
             if (lastDate !== messageDate) {
@@ -1366,11 +1575,13 @@ class REonikaMessenger {
             }
             
             const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isSent ? 'sent' : 'received'} ${lastSenderId === message.sender_id ? 'same-sender' : ''}`;
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'} ${lastSenderId === message.sender_id ? 'same-sender' : ''} ${isDeleted ? 'deleted' : ''}`;
             
             let content = '';
             
-            if (message.image_url) {
+            if (isDeleted) {
+                content += `<div class="message-text deleted-text"><i>Сообщение удалено</i></div>`;
+            } else if (message.image_url) {
                 content += `
                     <div class="message-image-container">
                         <img src="${message.image_url}" alt="Изображение" class="message-img" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML+='<div class=\\'message-text\\'>⚠️ Не удалось загрузить изображение</div>'">
@@ -1385,12 +1596,25 @@ class REonikaMessenger {
                 <div class="message-footer">
                     <div class="message-time">${this.formatTime(message.created_at)}</div>
                     ${isSent ? `<div class="message-status ${message.is_read ? 'read' : 'unread'}">${message.is_read ? '✓✓' : '✓'}</div>` : ''}
+                    ${isSent && !isDeleted ? `<button class="btn-icon delete-message-btn" data-message-id="${message.id}" title="Удалить сообщение"><i class="fas fa-trash"></i></button>` : ''}
                 </div>
             `;
             
             messageDiv.innerHTML = content;
             
-            if (message.image_url) {
+            // Добавляем обработчик удаления сообщения
+            if (isSent && !isDeleted) {
+                const deleteBtn = messageDiv.querySelector('.delete-message-btn');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const messageId = deleteBtn.getAttribute('data-message-id');
+                        this.deleteMessage(messageId);
+                    });
+                }
+            }
+            
+            if (message.image_url && !isDeleted) {
                 const img = messageDiv.querySelector('.message-img');
                 if (img) {
                     img.addEventListener('click', () => {
@@ -1525,6 +1749,21 @@ class REonikaMessenger {
         if (mainScreen) {
             mainScreen.style.display = 'block';
             mainScreen.classList.remove('hidden');
+        }
+        
+        // Добавляем кнопку удаления аккаунта
+        const navLinks = document.querySelector('.nav-links');
+        if (navLinks && !navLinks.querySelector('#delete-account-btn')) {
+            const deleteAccountBtn = document.createElement('button');
+            deleteAccountBtn.id = 'delete-account-btn';
+            deleteAccountBtn.className = 'btn-secondary';
+            deleteAccountBtn.style.backgroundColor = 'var(--error)';
+            deleteAccountBtn.style.color = 'white';
+            deleteAccountBtn.style.marginLeft = '12px';
+            deleteAccountBtn.innerHTML = '<i class="fas fa-user-slash"></i> Удалить аккаунт';
+            navLinks.insertBefore(deleteAccountBtn, navLinks.querySelector('#logout-btn'));
+            
+            deleteAccountBtn.addEventListener('click', () => this.deleteAccount());
         }
     }
 }
