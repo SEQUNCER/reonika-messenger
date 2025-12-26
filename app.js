@@ -33,6 +33,13 @@ class REonikaMessenger {
         // Запускаем ежедневную очистку старых сообщений
         this.startAutoCleanup();
 
+        // Инициализация уведомлений
+        setTimeout(() => {
+            if (window.notifications) {
+                console.log('Уведомления интегрированы');
+            }
+        }, 500);
+
         // В конце конструктора REonikaMessenger (после this.startAutoCleanup())
         setTimeout(() => {
             // Инициализируем мобильные улучшения если они загружены
