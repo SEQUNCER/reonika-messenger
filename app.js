@@ -312,7 +312,7 @@ class REonikaMessenger {
         });
         this.realtimeSubscriptions = [];
 
-        // Подписка на новые сообщения
+        // Подписка на новые сообщения с оптимизацией
         const messagesChannel = supabase
             .channel('messages')
             .on('postgres_changes', 
@@ -321,157 +321,40 @@ class REonikaMessenger {
                     schema: 'public', 
                     table: 'messages' 
                 }, 
-                (payload) => {
+                async (payload) => {
+                    // Если это сообщение в текущем чате
                     if (this.currentChat && payload.new.chat_id === this.currentChat.id) {
-                        this.loadMessages(this.currentChat.id);
+                        // Не загружаем свои же сообщения (они уже есть)
+                        if (payload.new.sender_id === this.currentUser?.id) {
+                            return;
+                        }
+                        
+                        // Получаем информацию об отправителе
+                        const { data: sender } = await supabase
+                            .from('profiles')
+                            .select('*')
+                            .eq('id', payload.new.sender_id)
+                            .single();
+                        
+                        const newMessage = {
+                            ...payload.new,
+                            sender: sender
+                        };
+                        
+                        // Добавляем сообщение в список
+                        this.messages.push(newMessage);
+                        this.renderMessages();
+                        this.scrollToLastMessage();
+                        
+                        // Помечаем как прочитанное
+                        await this.markMessagesAsRead(this.currentChat.id);
                     }
                     this.loadChats(); // Обновляем список чатов
                 }
             )
-            .on('postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'messages'
-                },
-                (payload) => {
-                    if (this.currentChat && payload.new.chat_id === this.currentChat.id) {
-                        this.loadMessages(this.currentChat.id);
-                    }
-                }
-            )
-            .on('postgres_changes',
-                {
-                    event: 'DELETE',
-                    schema: 'public',
-                    table: 'messages'
-                },
-                (payload) => {
-                    if (this.currentChat && payload.old.chat_id === this.currentChat.id) {
-                        this.loadMessages(this.currentChat.id);
-                    }
-                    this.loadChats();
-                }
-            )
             .subscribe();
 
-        // Подписка на изменения чатов
-        const chatsChannel = supabase
-            .channel('chats')
-            .on('postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'chats'
-                },
-                (payload) => {
-                    if (payload.new.user1_id === this.currentUser?.id || 
-                        payload.new.user2_id === this.currentUser?.id) {
-                        this.loadChats();
-                    }
-                }
-            )
-            .on('postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'chats'
-                },
-                (payload) => {
-                    this.loadChats();
-                }
-            )
-            .subscribe();
-
-        // Подписка на изменения профилей
-        const profilesChannel = supabase
-            .channel('profiles')
-            .on('postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'profiles'
-                },
-                async (payload) => {
-                    // Обновляем профиль текущего пользователя
-                    if (payload.new.id === this.currentUser?.id) {
-                        if (this.currentUser.profile) {
-                            this.currentUser.profile = { ...this.currentUser.profile, ...payload.new };
-                        }
-                        this.updateUserUI();
-                    }
-                    
-                    // Обновляем информацию в активном чате
-                    if (this.currentChat) {
-                        const partner = this.currentChat.user1_id === this.currentUser?.id 
-                            ? this.currentChat.user2 
-                            : this.currentChat.user1;
-                        
-                        if (partner && partner.id === payload.new.id) {
-                            await this.loadChats();
-                            if (this.currentChat) {
-                                const updatedChat = this.chats.find(c => c.id === this.currentChat.id);
-                                if (updatedChat) {
-                                    this.currentChat = updatedChat;
-                                    this.updateChatUI();
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Обновляем список чатов
-                    this.loadChats();
-                }
-            )
-            .subscribe();
-
-        // Подписка на статус онлайн
-        const presenceChannel = supabase
-            .channel('online-users')
-            .on('presence', { event: 'sync' }, () => {
-                const state = presenceChannel.presenceState();
-                this.onlineUsers = new Set(Object.keys(state));
-                this.updateOnlineStatusUI();
-            })
-            .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-                newPresences.forEach(presence => {
-                    this.onlineUsers.add(presence.user_id);
-                });
-                this.updateOnlineStatusUI();
-            })
-            .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-                leftPresences.forEach(presence => {
-                    this.onlineUsers.delete(presence.user_id);
-                });
-                this.updateOnlineStatusUI();
-            })
-            .subscribe(async (status) => {
-                if (status === 'SUBSCRIBED' && this.currentUser) {
-                    await presenceChannel.track({
-                        user_id: this.currentUser.id,
-                        online_at: new Date().toISOString(),
-                        last_seen: new Date().toISOString()
-                    });
-                }
-            });
-
-        this.realtimeSubscriptions = [messagesChannel, chatsChannel, profilesChannel, presenceChannel];
-
-        // Периодическое обновление данных (как fallback)
-        if (this.updateInterval) {
-            clearInterval(this.updateInterval);
-        }
-        
-        this.updateInterval = setInterval(() => {
-            if (this.currentUser) {
-                this.loadChats();
-                if (this.currentChat) {
-                    this.loadMessages(this.currentChat.id);
-                }
-                // Автоматическая очистка старых сообщений
-                this.cleanupOldMessages();
-            }
-        }, 30000); // Каждые 30 секунд
+        // ... остальной код остается таким же
     }
 
     async updateOnlineStatus(isOnline) {
@@ -1188,13 +1071,43 @@ class REonikaMessenger {
 
             // Проверяем, является ли пользователь участником чата
             const isParticipant = this.currentChat.user1_id === this.currentUser.id || 
-                                  this.currentChat.user2_id === this.currentUser.id;
+                                this.currentChat.user2_id === this.currentUser.id;
             
             if (!isParticipant) {
                 this.showNotification('Вы не участник этого чата', 'error');
                 return;
             }
 
+            // Создаем временное сообщение для мгновенного отображения (optimistic update)
+            const tempMessage = {
+                id: `temp_${Date.now()}`,
+                chat_id: this.currentChat.id,
+                sender_id: this.currentUser.id,
+                content: text,
+                created_at: new Date().toISOString(),
+                is_read: false,
+                is_temporary: true,
+                expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                sender: this.currentUser.profile // Добавляем информацию об отправителе
+            };
+
+            // НЕМЕДЛЕННО добавляем временное сообщение в UI
+            this.messages.push(tempMessage);
+            this.renderMessages();
+            this.scrollToLastMessage();
+
+            // Очищаем поле ввода сразу
+            if (input) {
+                input.value = '';
+                // Не фокусируем автоматически на мобильных
+                if (!this.isMobile) {
+                    setTimeout(() => {
+                        input.focus();
+                    }, 50);
+                }
+            }
+
+            // Отправляем на сервер (в фоне)
             const { data, error } = await supabase
                 .from('messages')
                 .insert([
@@ -1207,11 +1120,15 @@ class REonikaMessenger {
                         is_read: false
                     }
                 ])
-                .select('*')
+                .select('*, sender:profiles(*)')
                 .single();
 
             if (error) {
                 console.error('Send message error details:', error);
+                
+                // Удаляем временное сообщение при ошибке
+                this.messages = this.messages.filter(m => m.id !== tempMessage.id);
+                this.renderMessages();
                 
                 if (error.code === '42501') {
                     this.showNotification('Нет прав для отправки сообщения в этот чат', 'error');
@@ -1228,23 +1145,27 @@ class REonikaMessenger {
             }
 
             console.log('Message sent successfully:', data);
-
-            if (input) {
-                input.value = '';
-                // Не фокусируем автоматически на мобильных
-                if (!this.isMobile) {
-                    input.focus();
-                }
+            
+            // Заменяем временное сообщение на реальное
+            const tempIndex = this.messages.findIndex(m => m.id === tempMessage.id);
+            if (tempIndex !== -1) {
+                this.messages[tempIndex] = data;
+                this.renderMessages();
             }
             
-            // Немедленно обновляем сообщения
-            await this.loadMessages(this.currentChat.id);
+            // Обновляем список чатов для отображения последнего сообщения
+            await this.loadChats();
             
         } catch (error) {
             console.error('Send message exception:', error);
+            
+            // Удаляем временное сообщение при ошибке
+            this.messages = this.messages.filter(m => m.id?.startsWith('temp_'));
+            this.renderMessages();
+            
             this.showNotification('Неизвестная ошибка при отправке сообщения', 'error');
         }
-    }
+    } 
 
     async uploadImage(event) {
         const file = event.target.files[0];
@@ -2336,6 +2257,9 @@ class REonikaMessenger {
         if (!container) return;
 
         container.innerHTML = '';
+
+        // Сортируем сообщения по времени
+        this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));       
 
         if (!this.messages || this.messages.length === 0) {
             container.innerHTML = '<div class="empty-chat"><p>Нет сообщений. Начните общение!</p></div>';

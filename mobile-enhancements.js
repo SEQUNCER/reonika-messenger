@@ -763,6 +763,8 @@ class MobileREonikaEnhancements {
     }
 }
 
+
+
 document.addEventListener('DOMContentLoaded', () => {
     const checkMessenger = () => {
         if (window.messenger) {
