@@ -7,12 +7,13 @@ class REonikaMessenger {
         this.chats = [];
         this.messages = [];
         this.onlineUsers = new Set();
-        this.voiceMessages = new Map(); // Для хранения аудио объектов
+        this.voiceMessages = new Map();
         
         this.searchTimeout = null;
         this.updateInterval = null;
         this.realtimeSubscriptions = [];
         this.isMobile = window.innerWidth <= 768;
+        this.isSessionRestored = false; // Флаг восстановления сессии
         
         // Голосовые сообщения
         this.isRecording = false;
@@ -23,7 +24,8 @@ class REonikaMessenger {
         this.currentAudio = null;
         
         this.initEventListeners();
-        this.checkAuth();
+        this.initAuthStateListener(); // Инициализация слушателя состояния аутентификации
+        this.autoLogin(); // Автоматический вход
         
         window.addEventListener('resize', () => {
             this.isMobile = window.innerWidth <= 768;
@@ -40,13 +42,193 @@ class REonikaMessenger {
             }
         }, 500);
 
-        // В конце конструктора REonikaMessenger (после this.startAutoCleanup())
         setTimeout(() => {
-            // Инициализируем мобильные улучшения если они загружены
             if (window.mobileEnhancements) {
                 console.log('Мобильные улучшения интегрированы');
             }
         }, 500);
+    }
+
+    // Инициализация слушателя состояния аутентификации
+    initAuthStateListener() {
+        supabase.auth.onAuthStateChange((event, session) => {
+            console.log('Auth state changed:', event, session);
+            
+            switch (event) {
+                case 'SIGNED_IN':
+                    console.log('User signed in!');
+                    if (!this.isSessionRestored) {
+                        this.handleUserSignIn(session.user);
+                    }
+                    break;
+                    
+                case 'TOKEN_REFRESHED':
+                    console.log('Token refreshed');
+                    if (this.currentUser && this.currentUser.id === session?.user?.id) {
+                        this.updateOnlineStatus(true);
+                    }
+                    break;
+                    
+                case 'SIGNED_OUT':
+                    console.log('User signed out!');
+                    this.handleUserSignOut();
+                    break;
+                    
+                case 'USER_UPDATED':
+                    console.log('User updated');
+                    if (session?.user) {
+                        this.currentUser = session.user;
+                        this.updateUserUI();
+                    }
+                    break;
+                    
+                case 'INITIAL_SESSION':
+                    console.log('Initial session restored');
+                    this.isSessionRestored = true;
+                    if (session?.user) {
+                        this.handleUserSignIn(session.user);
+                    }
+                    break;
+                    
+                case 'USER_DELETED':
+                    console.log('User deleted');
+                    this.handleUserSignOut();
+                    break;
+            }
+        });
+    }
+
+    // Автоматический вход
+    async autoLogin() {
+        try {
+            console.log('Attempting auto login...');
+            
+            // Показываем индикатор загрузки
+            this.showLoading(true);
+            
+            // Проверяем, есть ли сохраненная сессия
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionError) {
+                console.error('Session error:', sessionError);
+                this.showLoading(false);
+                this.showAuthScreen();
+                return;
+            }
+            
+            if (session) {
+                console.log('Found existing session');
+                // Получаем пользователя из сессии
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                
+                if (userError) {
+                    console.error('User error:', userError);
+                    this.showLoading(false);
+                    this.showAuthScreen();
+                    return;
+                }
+                
+                if (user) {
+                    console.log('User found, auto login successful');
+                    this.isSessionRestored = true;
+                    await this.handleUserSignIn(user);
+                    this.showLoading(false);
+                    return;
+                }
+            }
+            
+            // Если сессии нет, показываем экран аутентификации
+            console.log('No session found, showing auth screen');
+            this.showLoading(false);
+            this.showAuthScreen();
+            
+        } catch (error) {
+            console.error('Auto login error:', error);
+            this.showLoading(false);
+            this.showAuthScreen();
+        }
+    }
+
+    // Обработка входа пользователя
+    async handleUserSignIn(user) {
+        try {
+            this.currentUser = user;
+            
+            // Загружаем профиль пользователя
+            await this.loadUserProfile();
+            
+            // Показываем главный экран
+            this.showMainScreen();
+            this.showChatsScreen();
+            
+            // Настраиваем real-time подписки
+            this.setupRealtime();
+            
+            // Обновляем статус онлайн
+            await this.updateOnlineStatus(true);
+            
+            // Обновляем UI
+            this.updateUserUI();
+            this.updateProfileUI();
+            
+            // Загружаем чаты
+            await this.loadChats();
+            
+            console.log('User signed in successfully:', user.email);
+            
+        } catch (error) {
+            console.error('Error handling user sign in:', error);
+            this.showNotification('Ошибка загрузки данных пользователя', 'error');
+            await this.logout();
+        }
+    }
+
+    // Обработка выхода пользователя
+    async handleUserSignOut() {
+        try {
+            // Останавливаем real-time подписки
+            this.realtimeSubscriptions.forEach(subscription => {
+                supabase.removeChannel(subscription);
+            });
+            this.realtimeSubscriptions = [];
+            
+            // Очищаем интервалы
+            if (this.updateInterval) {
+                clearInterval(this.updateInterval);
+                this.updateInterval = null;
+            }
+            
+            // Сбрасываем состояние
+            this.currentUser = null;
+            this.currentChat = null;
+            this.chats = [];
+            this.messages = [];
+            this.onlineUsers.clear();
+            this.isSessionRestored = false;
+            
+            // Очищаем кэш голосовых сообщений
+            this.voiceMessages.clear();
+            
+            // Показываем экран аутентификации
+            this.showAuthScreen();
+            
+            console.log('User signed out successfully');
+            
+        } catch (error) {
+            console.error('Error handling user sign out:', error);
+        }
+    }
+
+    // Показ/скрытие индикатора загрузки
+    showLoading(show) {
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            if (show) {
+                loadingOverlay.classList.remove('hidden');
+            } else {
+                loadingOverlay.classList.add('hidden');
+            }
+        }
     }
 
     initEventListeners() {
@@ -437,6 +619,9 @@ class REonikaMessenger {
         }
 
         try {
+            // Показываем индикатор загрузки
+            this.showLoading(true);
+            
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password
@@ -444,6 +629,8 @@ class REonikaMessenger {
 
             if (error) {
                 console.error('Login error:', error);
+                this.showLoading(false);
+                
                 if (error.message.includes('Invalid login credentials')) {
                     this.showNotification('Неверный email или пароль', 'error');
                 } else if (error.message.includes('Email not confirmed')) {
@@ -454,18 +641,18 @@ class REonikaMessenger {
                 return;
             }
 
-            this.currentUser = data.user;
-            await this.loadUserProfile();
-            this.showMainScreen();
-            this.showChatsScreen();
-            this.showNotification('Вход выполнен успешно', 'success');
+            // Обработка входа произойдет в handleUserSignIn через слушатель
             
             // Очистка полей
             if (emailInput) emailInput.value = '';
             if (passwordInput) passwordInput.value = '';
             
+            // Показываем уведомление
+            this.showNotification('Вход выполнен успешно', 'success');
+            
         } catch (error) {
             console.error('Login exception:', error);
+            this.showLoading(false);
             this.showNotification('Ошибка входа', 'error');
         }
     }
@@ -531,32 +718,23 @@ class REonikaMessenger {
             // Обновляем статус перед выходом
             await this.updateOnlineStatus(false);
             
-            // Отписываемся от всех подписок
-            this.realtimeSubscriptions.forEach(subscription => {
-                supabase.removeChannel(subscription);
-            });
-            this.realtimeSubscriptions = [];
-            
-            if (this.updateInterval) {
-                clearInterval(this.updateInterval);
-                this.updateInterval = null;
-            }
-            
+            // Вызываем выход из Supabase
             const { error } = await supabase.auth.signOut();
+            
             if (error) {
                 console.error('Logout error:', error);
+                this.showNotification('Ошибка выхода из системы', 'error');
+                return;
             }
             
-            this.currentUser = null;
-            this.currentChat = null;
-            this.chats = [];
-            this.messages = [];
-            this.onlineUsers.clear();
-            
-            this.showAuthScreen();
+            // Показываем уведомление
             this.showNotification('Вы вышли из системы', 'success');
+            
+            // Обработка выхода произойдет в handleUserSignOut через слушатель
+            
         } catch (error) {
             console.error('Logout exception:', error);
+            this.showNotification('Ошибка выхода из системы', 'error');
         }
     }
 
