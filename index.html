@@ -67,48 +67,22 @@
     </div>
     
     <div id="main-screen" class="hidden">
-        <nav class="navbar">
-            <div class="container nav-content">
-                <a href="#" class="nav-logo">
-                    <i class="fas fa-comments"></i>
-                    <span>REonika</span>
-                </a>
-                
-                <div class="nav-links">
-                    <button id="nav-chats-btn" class="active">
-                        <i class="fas fa-comments"></i>
-                        <span>Чаты</span>
-                    </button>
-                    <button id="nav-profile-btn">
-                        <i class="fas fa-user"></i>
-                        <span>Профиль</span>
-                    </button>
-                    <div class="user-info">
-                        <div class="avatar" id="nav-avatar"></div>
-                        <span id="nav-username">Пользователь</span>
-                    </div>
-                    <button id="logout-btn" class="btn-primary">
-                        <i class="fas fa-sign-out-alt"></i> <span>Выйти</span>
-                    </button>
-                </div>
-            </div>
-        </nav>
-
         <div id="chats-screen" class="container">
             <div class="app-container">
                 <div class="sidebar">
-                    <div class="user-profile">
+                    <div class="user-profile clickable" id="open-profile-btn">
                         <div class="avatar medium" id="current-user-avatar"></div>
                         <div class="user-details">
                             <h3 id="current-user-name">Загрузка...</h3>
                             <p id="current-user-email">...</p>
                             <p id="current-user-status" class="user-status"></p>
                         </div>
+                        <i class="fas fa-chevron-right profile-arrow"></i>
                     </div>
                     
                     <div class="search-container">
-                        <input type="text" id="user-search" placeholder="Поиск по имени или email..." autocomplete="off">
-                        <button id="search-user-btn" class="btn-primary tooltip" data-tooltip="Поиск пользователей">
+                        <input type="text" id="user-search" placeholder="Поиск..." autocomplete="off">
+                        <button id="search-user-btn" class="btn-primary tooltip" data-tooltip="Поиск">
                             <i class="fas fa-search"></i>
                         </button>
                     </div>
@@ -116,6 +90,13 @@
                     <div class="search-results" id="search-results" style="display: none;"></div>
                     
                     <div class="chats-list" id="chats-list">
+                    </div>
+                    
+                    <div class="sidebar-footer">
+                        <button id="logout-btn" class="btn-logout">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Выйти</span>
+                        </button>
                     </div>
                 </div>
                 
@@ -161,84 +142,6 @@
                 </div>
             </div>
         </div>
-
-        <div id="profile-screen" class="container hidden">
-            <div class="profile-container">
-                <div class="profile-header">
-                    <h1>Мой профиль</h1>
-                    <p>Управление вашей учетной записью и настройками</p>
-                </div>
-                
-                <div class="profile-avatar-container">
-                    <div class="avatar large" id="profile-avatar">
-                    </div>
-                    <label for="profile-avatar-upload" class="avatar-overlay">
-                        <i class="fas fa-camera"></i>
-                        <input type="file" id="profile-avatar-upload" accept="image/*" style="display: none;">
-                    </label>
-                </div>
-                
-                <form class="profile-form" id="profile-form">
-                    <div class="form-section">
-                        <h3><i class="fas fa-user-edit"></i> Основная информация</h3>
-                        
-                        <div class="profile-field">
-                            <label for="profile-username">Имя пользователя</label>
-                            <input type="text" id="profile-username" placeholder="Введите ваше имя" required autocomplete="off">
-                        </div>
-                        
-                        <div class="profile-field">
-                            <label for="profile-email">Email</label>
-                            <input type="email" id="profile-email" placeholder="Ваш email" disabled>
-                        </div>
-                        
-                        <div class="profile-field">
-                            <label for="profile-status">Статус</label>
-                            <input type="text" id="profile-status" placeholder="Напишите что-нибудь о себе..." autocomplete="off">
-                        </div>
-                        
-                        <button type="button" id="save-profile-btn" class="btn-primary">
-                            <i class="fas fa-save"></i> Сохранить изменения
-                        </button>
-                    </div>
-                    
-                    <div class="form-section">
-                        <h3><i class="fas fa-lock"></i> Безопасность</h3>
-                        
-                        <div class="profile-field">
-                            <label for="current-password">Текущий пароль</label>
-                            <input type="password" id="current-password" placeholder="Для подтверждения изменений" autocomplete="off">
-                        </div>
-                        
-                        <div class="profile-field">
-                            <label for="new-password">Новый пароль</label>
-                            <input type="password" id="new-password" placeholder="Оставьте пустым, если не хотите менять" autocomplete="off">
-                        </div>
-                        
-                        <div class="profile-field">
-                            <label for="confirm-password">Подтвердите пароль</label>
-                            <input type="password" id="confirm-password" placeholder="Повторите новый пароль" autocomplete="off">
-                        </div>
-                        
-                        <button type="button" id="change-password-btn" class="btn-secondary-outline">
-                            <i class="fas fa-key"></i> Изменить пароль
-                        </button>
-                    </div>
-                    
-                    <div class="form-section danger-zone">
-                        <h3><i class="fas fa-exclamation-triangle"></i> Опасная зона</h3>
-                        
-                        <p>Эти действия необратимы. Пожалуйста, будьте осторожны.</p>
-                        
-                        <div class="profile-field">
-                            <button type="button" id="delete-account-btn" class="btn-danger">
-                                <i class="fas fa-user-slash"></i> Удалить аккаунт
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
     </div>
 
     <div id="loading-overlay" class="loading-overlay hidden">
@@ -255,6 +158,73 @@
             <div class="confirm-modal-buttons">
                 <button id="confirm-modal-cancel" class="confirm-modal-cancel">Отмена</button>
                 <button id="confirm-modal-confirm" class="confirm-modal-confirm">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно профиля -->
+    <div id="profile-modal" class="profile-modal hidden">
+        <div class="profile-modal-overlay" id="profile-modal-overlay"></div>
+        <div class="profile-modal-content">
+            <div class="profile-modal-header">
+                <button id="close-profile-btn" class="btn-close-profile">
+                    <i class="fas fa-times"></i>
+                </button>
+                <h2>Профиль</h2>
+            </div>
+            
+            <div class="profile-modal-body">
+                <div class="profile-avatar-container-modal">
+                    <div class="avatar large" id="profile-avatar-modal"></div>
+                    <label for="profile-avatar-upload-modal" class="avatar-overlay">
+                        <i class="fas fa-camera"></i>
+                        <input type="file" id="profile-avatar-upload-modal" accept="image/*" style="display: none;">
+                    </label>
+                </div>
+                
+                <form class="profile-form" id="profile-form-modal">
+                    <div class="form-section">
+                        <div class="profile-field">
+                            <label for="profile-username-modal">Имя</label>
+                            <input type="text" id="profile-username-modal" placeholder="Ваше имя" required autocomplete="off">
+                        </div>
+                        
+                        <div class="profile-field">
+                            <label for="profile-status-modal">Статус</label>
+                            <input type="text" id="profile-status-modal" placeholder="Ваш статус" autocomplete="off">
+                        </div>
+                        
+                        <button type="button" id="save-profile-btn-modal" class="btn-primary btn-full">
+                            <i class="fas fa-save"></i> Сохранить
+                        </button>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3><i class="fas fa-lock"></i> Пароль</h3>
+                        
+                        <div class="profile-field">
+                            <label for="current-password-modal">Текущий</label>
+                            <input type="password" id="current-password-modal" placeholder="Текущий пароль" autocomplete="off">
+                        </div>
+                        
+                        <div class="profile-field">
+                            <label for="new-password-modal">Новый</label>
+                            <input type="password" id="new-password-modal" placeholder="Новый пароль" autocomplete="off">
+                        </div>
+                        
+                        <button type="button" id="change-password-btn-modal" class="btn-secondary btn-full">
+                            <i class="fas fa-key"></i> Изменить пароль
+                        </button>
+                    </div>
+                    
+                    <div class="form-section danger-zone">
+                        <h3><i class="fas fa-exclamation-triangle"></i> Опасная зона</h3>
+                        
+                        <button type="button" id="delete-account-btn-modal" class="btn-danger btn-full">
+                            <i class="fas fa-user-slash"></i> Удалить аккаунт
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -336,11 +306,13 @@
             document.documentElement.style.setProperty('--vh', `${vh}px`);
             
             const chatsList = document.querySelector('.chats-list');
-            if (chatsList && window.innerWidth <= 768) {
-                const headerHeight = document.querySelector('.navbar').offsetHeight;
-                const searchHeight = document.querySelector('.search-container').offsetHeight;
-                const profileHeight = document.querySelector('.user-profile').offsetHeight;
-                const availableHeight = window.innerHeight - headerHeight - searchHeight - profileHeight - 20;
+            const sidebar = document.querySelector('.sidebar');
+            if (chatsList && sidebar) {
+                const sidebarHeight = sidebar.offsetHeight;
+                const searchHeight = document.querySelector('.search-container')?.offsetHeight || 0;
+                const profileHeight = document.querySelector('.user-profile')?.offsetHeight || 0;
+                const footerHeight = document.querySelector('.sidebar-footer')?.offsetHeight || 0;
+                const availableHeight = sidebarHeight - searchHeight - profileHeight - footerHeight;
                 chatsList.style.height = availableHeight + 'px';
             }
         }

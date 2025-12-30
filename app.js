@@ -257,14 +257,42 @@ class REonikaMessenger {
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) logoutBtn.addEventListener('click', () => this.logout());
 
-        const navChatsBtn = document.getElementById('nav-chats-btn');
-        if (navChatsBtn) {
-            navChatsBtn.addEventListener('click', () => this.showChatsScreen());
+        // Открытие профиля по клику на аватарку
+        const openProfileBtn = document.getElementById('open-profile-btn');
+        if (openProfileBtn) {
+            openProfileBtn.addEventListener('click', () => this.openProfileModal());
         }
         
-        const navProfileBtn = document.getElementById('nav-profile-btn');
-        if (navProfileBtn) {
-            navProfileBtn.addEventListener('click', () => this.showProfileScreen());
+        // Закрытие модального окна профиля
+        const closeProfileBtn = document.getElementById('close-profile-btn');
+        if (closeProfileBtn) {
+            closeProfileBtn.addEventListener('click', () => this.closeProfileModal());
+        }
+
+        const profileModalOverlay = document.getElementById('profile-modal-overlay');
+        if (profileModalOverlay) {
+            profileModalOverlay.addEventListener('click', () => this.closeProfileModal());
+        }
+
+        // Кнопки модального окна профиля
+        const saveProfileBtnModal = document.getElementById('save-profile-btn-modal');
+        if (saveProfileBtnModal) {
+            saveProfileBtnModal.addEventListener('click', () => this.saveProfileFromModal());
+        }
+        
+        const changePasswordBtnModal = document.getElementById('change-password-btn-modal');
+        if (changePasswordBtnModal) {
+            changePasswordBtnModal.addEventListener('click', () => this.changePasswordFromModal());
+        }
+
+        const deleteAccountBtnModal = document.getElementById('delete-account-btn-modal');
+        if (deleteAccountBtnModal) {
+            deleteAccountBtnModal.addEventListener('click', () => this.showDeleteAccountConfirm());
+        }
+
+        const profileAvatarUploadModal = document.getElementById('profile-avatar-upload-modal');
+        if (profileAvatarUploadModal) {
+            profileAvatarUploadModal.addEventListener('change', (e) => this.uploadProfileAvatar(e));
         }
 
         const deleteChatBtn = document.getElementById('delete-chat-btn');
@@ -2657,6 +2685,151 @@ class REonikaMessenger {
                 notification.remove();
             }
         }, 3000);
+    }
+
+    // === Модальное окно профиля ===
+
+    openProfileModal() {
+        if (!this.currentUser?.profile) return;
+        
+        const profile = this.currentUser.profile;
+        const modal = document.getElementById('profile-modal');
+        
+        // Заполняем данными модальное окно
+        const usernameInput = document.getElementById('profile-username-modal');
+        const statusInput = document.getElementById('profile-status-modal');
+        
+        if (usernameInput) usernameInput.value = profile.username || '';
+        if (statusInput) statusInput.value = profile.status || '';
+        
+        // Обновляем аватарку в модальном окне
+        const profileAvatarModal = document.getElementById('profile-avatar-modal');
+        if (profileAvatarModal) {
+            profileAvatarModal.innerHTML = '';
+            if (profile.avatar_url) {
+                const img = document.createElement('img');
+                img.src = profile.avatar_url;
+                img.alt = profile.username;
+                img.className = 'profile-avatar';
+                img.onerror = () => {
+                    profileAvatarModal.textContent = profile.username.charAt(0).toUpperCase();
+                    profileAvatarModal.className = 'avatar large';
+                };
+                profileAvatarModal.appendChild(img);
+            } else {
+                profileAvatarModal.className = 'avatar large';
+                profileAvatarModal.textContent = profile.username.charAt(0).toUpperCase();
+                profileAvatarModal.style.backgroundColor = '#4a5568';
+                profileAvatarModal.style.color = '#fff';
+                profileAvatarModal.style.fontSize = '42px';
+                profileAvatarModal.style.fontWeight = 'bold';
+            }
+        }
+        
+        if (modal) {
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    closeProfileModal() {
+        const modal = document.getElementById('profile-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+    }
+
+    async saveProfileFromModal() {
+        const usernameInput = document.getElementById('profile-username-modal');
+        const statusInput = document.getElementById('profile-status-modal');
+        
+        const username = usernameInput ? usernameInput.value.trim() : '';
+        const status = statusInput ? statusInput.value.trim() : '';
+        
+        if (!username) {
+            this.showNotification('Введите имя пользователя', 'error');
+            return;
+        }
+        
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    username: username,
+                    status: status,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', this.currentUser.id);
+            
+            if (error) {
+                console.error('Error updating profile:', error);
+                this.showNotification('Ошибка сохранения профиля', 'error');
+                return;
+            }
+            
+            this.showNotification('Профиль успешно обновлён', 'success');
+            
+            // Обновляем локальные данные
+            this.currentUser.profile.username = username;
+            this.currentUser.profile.status = status;
+            
+            // Обновляем UI
+            this.updateUserUI();
+            
+        } catch (error) {
+            console.error('Save profile exception:', error);
+            this.showNotification('Ошибка сохранения профиля', 'error');
+        }
+    }
+
+    async changePasswordFromModal() {
+        const currentPasswordInput = document.getElementById('current-password-modal');
+        const newPasswordInput = document.getElementById('new-password-modal');
+        
+        const currentPassword = currentPasswordInput ? currentPasswordInput.value : '';
+        const newPassword = newPasswordInput ? newPasswordInput.value : '';
+        
+        if (!currentPassword || !newPassword) {
+            this.showNotification('Заполните все поля пароля', 'error');
+            return;
+        }
+        
+        if (newPassword.length < 6) {
+            this.showNotification('Новый пароль должен быть не менее 6 символов', 'error');
+            return;
+        }
+        
+        try {
+            const { error: authError } = await supabase.auth.signInWithPassword({
+                email: this.currentUser.email,
+                password: currentPassword
+            });
+            
+            if (authError) {
+                this.showNotification('Неверный текущий пароль', 'error');
+                return;
+            }
+            
+            const { error: updateError } = await supabase.auth.updateUser({
+                password: newPassword
+            });
+            
+            if (updateError) {
+                console.error('Error updating password:', updateError);
+                this.showNotification('Ошибка изменения пароля', 'error');
+                return;
+            }
+            
+            this.showNotification('Пароль успешно изменён', 'success');
+            
+            if (currentPasswordInput) currentPasswordInput.value = '';
+            if (newPasswordInput) newPasswordInput.value = '';
+            
+        } catch (error) {
+            console.error('Change password exception:', error);
+            this.showNotification('Ошибка изменения пароля', 'error');
+        }
     }
 
     showAuthScreen() {
