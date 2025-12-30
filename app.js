@@ -1,6 +1,31 @@
 import { supabase } from './supabase.js';
 
 class REonikaMessenger {
+
+    // Добавьте в app.js в начало класса REonikaMessenger
+    async startVoiceRecording() {
+        try {
+            // Проверяем поддержку
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                this.showNotification('Микрофон не поддерживается в этом браузере', 'error');
+                return;
+            }
+            
+            // Проверяем разрешения
+            const permission = await navigator.permissions.query({ name: 'microphone' });
+            if (permission.state === 'denied') {
+                this.showNotification('Разрешите доступ к микрофону в настройках приложения', 'error');
+                return;
+            }
+            
+            // Остальной код записи...
+            
+        } catch (error) {
+            console.error('Microphone error:', error);
+            this.showNotification('Ошибка доступа к микрофону', 'error');
+        }
+    }
+
     constructor() {
         this.currentUser = null;
         this.currentChat = null;
@@ -35,6 +60,8 @@ class REonikaMessenger {
         // Запускаем ежедневную очистку старых сообщений
         this.startAutoCleanup();
 
+
+        
         // Инициализация уведомлений
         setTimeout(() => {
             if (window.notifications) {

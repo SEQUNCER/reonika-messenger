@@ -2613,5 +2613,5 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
 }
 
 .btn-primary i, .nav-links button.active i {
-    color: var(--white);
+    color: #dddddd;
 }
