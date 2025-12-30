@@ -34,6 +34,9 @@ class REonikaMessenger {
         this.onlineUsers = new Set();
         this.voiceMessages = new Map();
         
+        this.currentImageFile = null;
+        this.imagePreviewUrl = null;
+        this.voiceRecordingTimeout = null;        
         this.searchTimeout = null;
         this.updateInterval = null;
         this.realtimeSubscriptions = [];
@@ -356,7 +359,7 @@ class REonikaMessenger {
         // Загрузка файлов в чат
         const imageUpload = document.getElementById('image-upload');
         if (imageUpload) {
-            imageUpload.addEventListener('change', (e) => this.uploadImage(e));
+            imageUpload.addEventListener('change', (e) => this.handleImageSelect(e));
         }
         
         // Загрузка аватара в профиле
@@ -1325,7 +1328,7 @@ class REonikaMessenger {
         }
     } 
 
-    async uploadImage(event) {
+    async handleImageSelect(event) {
         const file = event.target.files[0];
         if (!file || !this.currentChat || !this.currentUser) {
             console.error('Cannot upload image: missing data');
@@ -1334,7 +1337,7 @@ class REonikaMessenger {
 
         // Проверяем, является ли пользователь участником чата
         const isParticipant = this.currentChat.user1_id === this.currentUser.id || 
-                              this.currentChat.user2_id === this.currentUser.id;
+                            this.currentChat.user2_id === this.currentUser.id;
         
         if (!isParticipant) {
             this.showNotification('Вы не участник этого чата', 'error');
@@ -1352,16 +1355,121 @@ class REonikaMessenger {
             return;
         }
 
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${this.currentUser.id}/${Date.now()}.${fileExt}`;
+        // Создаем превью
+        this.currentImageFile = file;
+        this.imagePreviewUrl = URL.createObjectURL(file);
+        
+        // Показываем превью
+        this.showImagePreview();
+    }
+
+    showImagePreview() {
+        if (!this.imagePreviewUrl || !this.currentImageFile) return;
+        
+        // Создаем контейнер для превью
+        let previewContainer = document.getElementById('image-preview-container');
+        
+        if (!previewContainer) {
+            previewContainer = document.createElement('div');
+            previewContainer.id = 'image-preview-container';
+            previewContainer.className = 'image-preview-container';
+            previewContainer.innerHTML = `
+                <div class="image-preview">
+                    <img id="preview-image" src="${this.imagePreviewUrl}" alt="Превью">
+                    <button id="remove-preview-btn" class="image-preview-remove" title="Убрать">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="image-preview-actions">
+                    <input type="text" id="image-caption" placeholder="Добавьте подпись к изображению...">
+                    <button id="send-image-btn" class="btn-primary">
+                        <i class="fas fa-paper-plane"></i> Отправить
+                    </button>
+                    <button id="cancel-image-btn" class="btn-secondary" style="margin-left: 10px;">
+                        <i class="fas fa-times"></i> Отмена
+                    </button>
+                </div>
+            `;
+            
+            // Вставляем перед контейнером ввода
+            const chatInputContainer = document.getElementById('chat-input-container');
+            if (chatInputContainer) {
+                chatInputContainer.parentNode.insertBefore(previewContainer, chatInputContainer);
+            }
+            
+            // Добавляем обработчики
+            const removeBtn = document.getElementById('remove-preview-btn');
+            const sendBtn = document.getElementById('send-image-btn');
+            const cancelBtn = document.getElementById('cancel-image-btn');
+            
+            if (removeBtn) {
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.removeImagePreview();
+                });
+            }
+            
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => this.removeImagePreview());
+            }
+            
+            if (sendBtn) {
+                sendBtn.addEventListener('click', () => this.sendImageMessage());
+            }
+            
+            // Отправка по Enter в поле подписи
+            const captionInput = document.getElementById('image-caption');
+            if (captionInput) {
+                captionInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.sendImageMessage();
+                    }
+                });
+                
+                captionInput.focus();
+            }
+        }
+    }
+
+    removeImagePreview() {
+        // Очищаем URL объекта
+        if (this.imagePreviewUrl) {
+            URL.revokeObjectURL(this.imagePreviewUrl); // ИЗМЕНЕНО: убрана рекурсия
+        }
+        
+        this.currentImageFile = null;
+        this.imagePreviewUrl = null;
+        
+        // Удаляем контейнер превью
+        const previewContainer = document.getElementById('image-preview-container');
+        if (previewContainer) {
+            previewContainer.remove();
+        }
+        
+        // Очищаем поле загрузки
+        const imageUpload = document.getElementById('image-upload');
+        if (imageUpload) {
+            imageUpload.value = '';
+        }
+    }
+
+    async sendImageMessage() {
+        if (!this.currentImageFile || !this.currentChat || !this.currentUser) {
+            console.error('Cannot send image: missing data');
+            return;
+        }
 
         try {
             this.showNotification('Загрузка изображения...', 'info');
 
+            const fileExt = this.currentImageFile.name.split('.').pop();
+            const fileName = `${this.currentUser.id}/${Date.now()}.${fileExt}`;
+
             // Загружаем в Storage
             const { error: uploadError } = await supabase.storage
                 .from('chat_images')
-                .upload(fileName, file, {
+                .upload(fileName, this.currentImageFile, {
                     cacheControl: '3600',
                     upsert: false
                 });
@@ -1378,6 +1486,10 @@ class REonikaMessenger {
 
             console.log('Uploaded image URL:', publicUrl);
 
+            // Получаем подпись
+            const captionInput = document.getElementById('image-caption');
+            const caption = captionInput ? captionInput.value.trim() : '';
+
             // Вставляем сообщение с изображением
             const { data: messageData, error: messageError } = await supabase
                 .from('messages')
@@ -1385,7 +1497,7 @@ class REonikaMessenger {
                     {
                         chat_id: this.currentChat.id,
                         sender_id: this.currentUser.id,
-                        content: '🖼️ Изображение',
+                        content: caption || '🖼️ Изображение',
                         image_url: publicUrl,
                         created_at: new Date().toISOString(),
                         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 часа
@@ -1406,14 +1518,14 @@ class REonikaMessenger {
             // Немедленно обновляем сообщения
             await this.loadMessages(this.currentChat.id);
             
+            // Очищаем превью
+            this.removeImagePreview();
+            
         } catch (error) {
             console.error('Error uploading image:', error);
             this.showNotification(`Ошибка загрузки изображения: ${error.message}`, 'error');
-        } finally {
-            event.target.value = '';
         }
     }
-
     async uploadProfileAvatar(event) {
         const file = event.target.files[0];
         if (!file || !this.currentUser) return;
@@ -1852,64 +1964,133 @@ class REonikaMessenger {
         if (this.isRecording) return;
         
         try {
-            // Запрашиваем доступ к микрофону
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    sampleRate: 44100
-                }
-            });
+            // Проверяем поддержку
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                this.showNotification('Микрофон не поддерживается в этом браузере', 'error');
+                return;
+            }
             
-            this.mediaRecorder = new MediaRecorder(stream);
-            this.audioChunks = [];
+            // Проверяем разрешения
+            const permission = await navigator.permissions.query({ name: 'microphone' });
+            if (permission.state === 'denied') {
+                this.showNotification('Разрешите доступ к микрофону в настройках приложения', 'error');
+                return;
+            }
             
-            // Собираем аудио данные
-            this.mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    this.audioChunks.push(event.data);
-                }
-            };
+            // Очищаем предыдущий таймер
+            if (this.voiceRecordingTimeout) {
+                clearTimeout(this.voiceRecordingTimeout);
+                this.voiceRecordingTimeout = null;
+            }
             
-            // При окончании записи
-            this.mediaRecorder.onstop = async () => {
+            // Добавляем анимацию нажатия
+            const voiceBtn = document.getElementById('voice-record-btn');
+            if (voiceBtn) {
+                voiceBtn.classList.add('pressed');
+            }
+            
+            // Устанавливаем таймер для начала записи (через 300мс)
+            this.voiceRecordingTimeout = setTimeout(async () => {
                 try {
-                    const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-                    await this.sendVoiceMessage(audioBlob);
-                } catch (error) {
-                    console.error('Error in voice recording onstop:', error);
-                    this.showNotification('Ошибка обработки записи', 'error');
-                } finally {
-                    // Останавливаем все треки
-                    stream.getTracks().forEach(track => track.stop());
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            sampleRate: 44100
+                        }
+                    });
                     
-                    // Уже скрыли индикатор в stopVoiceRecording, но на всякий случай
-                    this.hideRecordingIndicator();
+                    this.mediaRecorder = new MediaRecorder(stream);
+                    this.audioChunks = [];
+                    
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            this.audioChunks.push(event.data);
+                        }
+                    };
+                    
+                    this.mediaRecorder.onstop = async () => {
+                        try {
+                            const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                            await this.sendVoiceMessage(audioBlob);
+                        } catch (error) {
+                            console.error('Error in voice recording onstop:', error);
+                            this.showNotification('Ошибка обработки записи', 'error');
+                        } finally {
+                            // Останавливаем все треки
+                            stream.getTracks().forEach(track => track.stop());
+                            
+                            // Убираем анимацию
+                            if (voiceBtn) {
+                                voiceBtn.classList.remove('recording');
+                                voiceBtn.classList.remove('pressed');
+                            }
+                            
+                            // Скрываем индикатор
+                            this.hideRecordingIndicator();
+                        }
+                    };
+                    
+                    // Начинаем запись
+                    this.mediaRecorder.start(100);
+                    this.isRecording = true;
+                    this.recordingStartTime = Date.now();
+                    
+                    // Меняем анимацию на "запись"
+                    if (voiceBtn) {
+                        voiceBtn.classList.remove('pressed');
+                        voiceBtn.classList.add('recording');
+                    }
+                    
+                    // Показываем индикатор записи
+                    this.showRecordingIndicator();
+                    
+                    // Запускаем таймер
+                    this.startRecordingTimer();
+                    
+                } catch (error) {
+                    console.error('Error getting microphone stream:', error);
+                    this.showNotification('Не удалось получить доступ к микрофону', 'error');
+                    
+                    // Убираем анимацию при ошибке
+                    const voiceBtn = document.getElementById('voice-record-btn');
+                    if (voiceBtn) {
+                        voiceBtn.classList.remove('pressed');
+                    }
                 }
-            };
-            
-            // Запускаем запись
-            this.mediaRecorder.start(100); // Собираем данные каждые 100мс
-            this.isRecording = true;
-            this.recordingStartTime = Date.now();
-            
-            // Показываем индикатор записи
-            this.showRecordingIndicator();
-            
-            // Запускаем таймер
-            this.startRecordingTimer();
+            }, 300);
             
         } catch (error) {
-            console.error('Error starting voice recording:', error);
-            this.showNotification('Не удалось получить доступ к микрофону', 'error');
+            console.error('Microphone error:', error);
+            this.showNotification('Ошибка доступа к микрофону', 'error');
         }
     }
 
     stopVoiceRecording() {
-        if (!this.isRecording || !this.mediaRecorder) return;
+        // Отменяем таймер начала записи
+        if (this.voiceRecordingTimeout) {
+            clearTimeout(this.voiceRecordingTimeout);
+            this.voiceRecordingTimeout = null;
+        }
+        
+        // Убираем анимацию нажатия
+        const voiceBtn = document.getElementById('voice-record-btn');
+        if (voiceBtn) {
+            voiceBtn.classList.remove('pressed');
+        }
+        
+        if (!this.isRecording || !this.mediaRecorder) {
+            return;
+        }
+        
+        // Убираем анимацию записи
+        if (voiceBtn) {
+            voiceBtn.classList.remove('recording');
+            voiceBtn.classList.remove('pressed');
+        }
         
         // Останавливаем запись
-        if (this.mediaRecorder.state !== 'inactive') {
+        if (this.mediaRecorder.state === 'recording') {
             this.mediaRecorder.stop();
         }
         
@@ -1921,7 +2102,7 @@ class REonikaMessenger {
             this.recordingTimer = null;
         }
         
-        // Скрываем индикатор записи НЕМЕДЛЕННО
+        // Скрываем индикатор записи
         this.hideRecordingIndicator();
     }
 

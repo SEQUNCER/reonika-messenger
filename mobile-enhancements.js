@@ -812,15 +812,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Остановка записи
                 document.addEventListener('mouseup', () => {
-                    if (window.messenger.isRecording) {
-                        window.messenger.stopVoiceRecording();
+                    if (this.messenger.isRecording) {
+                        this.messenger.stopVoiceRecording();
                     }
                 });
-                
+
                 document.addEventListener('touchend', (e) => {
-                    if (window.messenger.isRecording) {
+                    if (this.messenger.isRecording) {
                         e.preventDefault();
-                        window.messenger.stopVoiceRecording();
+                        this.messenger.stopVoiceRecording();
                     }
                 });
             }

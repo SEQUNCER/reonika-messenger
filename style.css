@@ -1736,7 +1736,7 @@ body {
         right: 0;
         background: var(--white);
         border-top: 1px solid var(--border-gray);
-        padding: 12px 16px;
+        padding: 12px 20px !important;
         z-index: 1001;
         display: flex !important;
         gap: 10px;
@@ -1764,6 +1764,7 @@ body {
         background: var(--white);
         border: 1px solid var(--border-gray);
         color: var(--primary-gray);
+        margin: 0 2px;
     }
     
     .chat-input-container .btn-primary {
@@ -1773,6 +1774,7 @@ body {
         border-radius: 50%;
         flex-shrink: 0;
         background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
+        margin-left: 2px;
     }
     
     .chat-input-container .btn-primary i {
@@ -1847,7 +1849,7 @@ body {
     }
     
     .chat-input-container {
-        padding: 10px;
+        padding: 10px 16px !important;
         gap: 8px;
     }
     
@@ -1860,12 +1862,14 @@ body {
         padding: 8px;
         width: 40px;
         height: 40px;
+        margin: 0 1px;
     }
     
     .chat-input-container .btn-primary {
         padding: 10px;
         width: 40px;
         height: 40px;
+        margin-left: 1px;
     }
     
     .mobile-back-button {
@@ -1882,6 +1886,206 @@ body {
     .chat-messages {
         padding-bottom: 160px !important;
     }
+}
+
+/* Кнопка выхода на ПК - серая иконка */
+@media (min-width: 769px) {
+    #logout-btn {
+        background: var(--white) !important;
+        border: 1px solid var(--border-gray) !important;
+        color: var(--secondary-gray) !important;
+    }
+    
+    #logout-btn:hover {
+        background: var(--hover-gray) !important;
+    }
+    
+    #logout-btn i {
+        color: var(--secondary-gray) !important;
+    }
+    
+    #logout-btn:hover i {
+        color: var(--primary-gray) !important;
+    }
+}
+
+/* Контейнер для превью изображения */
+.image-preview-container {
+    position: absolute;
+    bottom: 80px;
+    left: 20px;
+    right: 20px;
+    background: var(--white);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-gray);
+    z-index: 100;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.image-preview {
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.image-preview img {
+    width: 100%;
+    max-height: 200px;
+    border-radius: 8px;
+    object-fit: contain;
+    background: var(--background-gray);
+}
+
+.image-preview-remove {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 32px;
+    height: 32px;
+    background: var(--error);
+    color: white;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.3s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.image-preview-remove:hover {
+    background: #c53030;
+    transform: scale(1.1);
+}
+
+.image-preview-actions {
+    display: flex;
+    gap: 10px;
+}
+
+#image-caption {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid var(--border-gray);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+#send-image-btn {
+    background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+#send-image-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(45, 55, 72, 0.2);
+}
+
+/* Анимация кнопки записи голоса */
+#voice-record-btn.pressed {
+    animation: voiceBtnPulse 0.6s ease-in-out infinite alternate;
+    background: linear-gradient(135deg, var(--error), #f56565) !important;
+    color: white !important;
+}
+
+#voice-record-btn.recording {
+    animation: voiceBtnRecording 1.5s ease-in-out infinite;
+    background: linear-gradient(135deg, var(--error), #f56565) !important;
+    color: white !important;
+    box-shadow: 0 0 0 8px rgba(229, 62, 62, 0.3);
+}
+
+@keyframes voiceBtnPulse {
+    from {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(229, 62, 62, 0.7);
+    }
+    to {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(229, 62, 62, 0);
+    }
+}
+
+@keyframes voiceBtnRecording {
+    0% {
+        box-shadow: 0 0 0 0 rgba(229, 62, 62, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 15px rgba(229, 62, 62, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(229, 62, 62, 0);
+    }
+}
+
+/* Индикатор записи голоса - улучшенный */
+.voice-recording-indicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(45, 55, 72, 0.95);
+    color: white;
+    padding: 24px 32px;
+    border-radius: 16px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-gray);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.voice-recording-indicator i {
+    font-size: 48px;
+    color: var(--error);
+    animation: recordingPulse 1s infinite;
+}
+
+@keyframes recordingPulse {
+    0%, 100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% { 
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+.voice-recording-timer {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    font-family: monospace;
+}
+
+.voice-recording-hint {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.8);
+    text-align: center;
+    max-width: 250px;
 }
 
 /* Профиль пользователя */
@@ -2236,42 +2440,6 @@ body {
     background: linear-gradient(135deg, #ed8936, #f6ad55);
 }
 
-/* Индикатор записи голоса */
-.voice-recording-indicator {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(45, 55, 72, 0.95);
-    color: white;
-    padding: 24px 32px;
-    border-radius: 16px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--border-gray);
-}
-
-.voice-recording-indicator i {
-    font-size: 48px;
-    color: #e53e3e;
-    animation: recording-pulse 1.5s infinite;
-}
-
-.voice-recording-timer {
-    font-size: 24px;
-    font-weight: bold;
-    color: white;
-}
-
-.voice-recording-hint {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.8);
-}
-
 /* Аватарки */
 .avatar {
     width: 50px;
@@ -2613,5 +2781,5 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
 }
 
 .btn-primary i, .nav-links button.active i {
-    color: #dddddd;
+    color: #ffffff;
 }
