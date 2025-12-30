@@ -370,37 +370,5 @@
             console.log('Приложение инициализировано. Мобильная поддержка:', isMobile);
         });
     </script>
-
-    <!-- Добавляем перед закрывающим тегом body -->
-    <script>
-        // Исправление высоты на мобильных устройствах
-        function setMobileHeight() {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-            
-            // Устанавливаем высоту для контейнеров
-            const chatsList = document.querySelector('.chats-list');
-            if (chatsList && window.innerWidth <= 768) {
-                const headerHeight = document.querySelector('.navbar').offsetHeight;
-                const searchHeight = document.querySelector('.search-container').offsetHeight;
-                const profileHeight = document.querySelector('.user-profile').offsetHeight;
-                const availableHeight = window.innerHeight - headerHeight - searchHeight - profileHeight - 20;
-                chatsList.style.height = availableHeight + 'px';
-            }
-        }
-        
-        // Устанавливаем высоту при загрузке и изменении размера
-        window.addEventListener('load', setMobileHeight);
-        window.addEventListener('resize', setMobileHeight);
-        window.addEventListener('orientationchange', setMobileHeight);
-        
-        // Также вызываем при изменении видимости
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                setTimeout(setMobileHeight, 100);
-            }
-        });
-    </script>
-
 </body>
 </html>

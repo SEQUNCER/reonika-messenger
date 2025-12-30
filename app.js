@@ -441,15 +441,8 @@ class REonikaMessenger {
     
     showChatsList() {
         const sidebar = document.querySelector('.sidebar');
-        const chatArea = document.getElementById('chat-area');
-        
-        if (this.isMobile) {
-            if (sidebar) {
-                sidebar.style.display = 'block';
-            }
-            if (chatArea) {
-                chatArea.classList.remove('chat-active');
-            }
+        if (sidebar && this.isMobile) {
+            sidebar.style.display = 'block';
         }
     }
 
@@ -798,6 +791,7 @@ class REonikaMessenger {
         }
     }
 
+    // Навигация между экранами
     showChatsScreen() {
         const chatsScreen = document.getElementById('chats-screen');
         const profileScreen = document.getElementById('profile-screen');
@@ -814,7 +808,7 @@ class REonikaMessenger {
             this.showChatsList();
         }
     }
-    
+
     showProfileScreen() {
         const chatsScreen = document.getElementById('chats-screen');
         const profileScreen = document.getElementById('profile-screen');
@@ -1130,10 +1124,63 @@ class REonikaMessenger {
     }
 
     // Обновленный метод selectChat с исправлением автофокуса
-// В методе selectChat обновляем мобильную часть:
-
-
-// Метод для прокрутки к последнему сообщению
+    async selectChat(chat) {
+        try {
+            this.currentChat = chat;
+            this.updateChatUI();
+            await this.loadMessages(chat.id);
+            
+            // Помечаем сообщения как прочитанные
+            await this.markMessagesAsRead(chat.id);
+            
+            // Активируем поле ввода
+            const messageInput = document.getElementById('message-input');
+            const sendBtn = document.getElementById('send-btn');
+            
+            if (messageInput) {
+                messageInput.disabled = false;
+                // НЕ фокусируем автоматически на мобильных устройствах
+                if (!this.isMobile) {
+                    setTimeout(() => {
+                        messageInput.focus();
+                    }, 100);
+                }
+            }
+            if (sendBtn) sendBtn.disabled = false;
+            
+            // Показываем чат
+            const chatHeader = document.getElementById('chat-header');
+            const chatInputContainer = document.getElementById('chat-input-container');
+            const noChatSelected = document.querySelector('.no-chat-selected');
+            const chatArea = document.getElementById('chat-area');
+            
+            if (chatHeader) chatHeader.style.display = 'flex';
+            if (chatInputContainer) chatInputContainer.style.display = 'flex';
+            if (noChatSelected) noChatSelected.style.display = 'none';
+            
+            // На мобильных скрываем список чатов и показываем чат
+            if (this.isMobile && chatArea) {
+                chatArea.classList.add('chat-active');
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar) {
+                    sidebar.style.display = 'none';
+                }
+            }
+            
+            this.hideSearchResults();
+            
+            // Прокручиваем к последнему сообщению
+            setTimeout(() => {
+                this.scrollToLastMessage();
+            }, 300);
+            
+        } catch (error) {
+            console.error('Error selecting chat:', error);
+            this.showNotification('Ошибка выбора чата', 'error');
+        }
+    }
+    
+    // Метод для прокрутки к последнему сообщению
     scrollToLastMessage() {
         const container = document.getElementById('messages-container');
         if (!container) return;

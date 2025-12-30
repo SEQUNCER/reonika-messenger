@@ -1,4 +1,4 @@
-/* Обновленный style.css с полным экраном чатов на мобильных */
+/* Обновленный style.css */
 
 /* Общие стили */
 * {
@@ -571,7 +571,7 @@ body {
     min-height: 100vh;
 }
 
-/* Основной интерфейс - ДЕСКТОП ВЕРСИЯ */
+/* Основной интерфейс */
 .app-container {
     display: flex;
     height: calc(100vh - 70px);
@@ -674,6 +674,17 @@ body {
     animation: fadeIn 0.3s ease;
 }
 
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .search-result-item {
     display: flex;
     align-items: center;
@@ -757,7 +768,6 @@ body {
     padding: 8px;
 }
 
-/* Список чатов */
 .chats-list {
     flex: 1;
     overflow-y: auto;
@@ -861,7 +871,7 @@ body {
     animation: pulse 2s infinite;
 }
 
-/* Область чата - ДЕСКТОП */
+/* Область чата */
 .chat-area {
     flex: 1;
     display: flex;
@@ -1395,6 +1405,35 @@ body {
     background: transparent;
 }
 
+/* Индикатор загрузки */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--lighter-gray);
+    border-radius: 50%;
+    border-top-color: var(--accent);
+    animation: spin 1s ease-in-out infinite;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* Подсказки */
 .tooltip {
     position: relative;
@@ -1460,259 +1499,108 @@ body {
     }
 }
 
-/* МОБИЛЬНАЯ ВЕРСИЯ - ПОЛНЫЙ ЭКРАН ЧАТОВ */
-@media (max-width: 768px) {
-    /* Фиксируем навигацию сверху */
-    .navbar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 1000;
-        background: var(--white);
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        padding: 12px 0;
-        min-height: 60px;
-    }
-    
-    .nav-content {
-        padding: 0 16px;
-    }
-    
-    .nav-logo span {
-        display: none;
-    }
-    
-    .nav-links {
-        gap: 8px;
-    }
-    
-    .user-info span {
-        display: none;
-    }
-    
-    .nav-links button span {
-        display: none;
-    }
-    
-    .nav-links button {
-        padding: 10px;
-        min-width: 44px;
-        min-height: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .nav-links button i {
-        margin: 0;
-        font-size: 18px;
-    }
-    
-    #logout-btn span {
-        display: none;
-    }
-    
-    /* Добавляем отступ для контента под навигацией */
-    #chats-screen {
-        margin-top: 60px;
-        height: calc(100vh - 60px);
-        padding: 0;
-    }
-    
-    .container {
-        padding: 0;
-        max-width: 100%;
-    }
-    
-    #chats-screen .container {
-        height: 100%;
-        padding: 0;
-    }
-    
-    /* Контейнер приложения - убираем flex, делаем на весь экран */
+/* Адаптивность для планшетов и десктопов */
+@media (max-width: 1024px) {
     .app-container {
         flex-direction: column;
-        height: calc(100vh - 60px);
-        margin-top: 0;
-        gap: 0;
-        width: 100%;
-        position: relative;
+        height: auto;
+        min-height: calc(100vh - 70px);
     }
     
-    /* Сайдбар - полный экран */
     .sidebar {
         width: 100%;
-        height: 100%;
-        margin-bottom: 0;
-        border-radius: 0;
-        display: block !important;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        padding: 0;
-        box-shadow: none;
+        margin-bottom: 20px;
+        max-height: 400px;
     }
     
-    .user-profile {
-        padding: 16px;
-        border-bottom: 1px solid var(--lighter-gray);
-        margin-bottom: 0;
-        background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
-        color: white;
-    }
-    
-    .user-profile .avatar {
-        border-color: white;
-    }
-    
-    .user-details h3 {
-        color: white;
-        font-size: 16px;
-    }
-    
-    .user-details p {
-        color: rgba(255, 255, 255, 0.8);
-        font-size: 12px;
-    }
-    
-    .user-status {
-        display: none;
-    }
-    
-    .search-container {
-        padding: 12px 16px;
-        margin-bottom: 0;
-        background: var(--white);
-        border-bottom: 1px solid var(--lighter-gray);
-        position: sticky;
-        top: 0;
-        z-index: 100;
-    }
-    
-    .search-container input {
-        padding: 12px 16px;
-        font-size: 16px;
-    }
-    
-    .search-container button {
-        padding: 12px 16px;
-        min-width: 44px;
-    }
-    
-    /* Список чатов - полный экран с прокруткой */
-    .chats-list {
-        flex: 1;
-        height: calc(100vh - 180px);
-        overflow-y: auto;
-        padding: 0;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    /* Элементы чата */
-    .chat-item {
-        margin: 0;
-        border-radius: 0;
-        border-bottom: 1px solid var(--lighter-gray);
-        padding: 16px;
-        min-height: 72px;
-    }
-    
-    .chat-item:last-child {
-        border-bottom: none;
-    }
-    
-    .chat-item:hover {
-        transform: none;
-        border-color: transparent;
-    }
-    
-    .chat-info {
-        flex: 1;
-        overflow: hidden;
-    }
-    
-    .chat-header-info h4 {
-        font-size: 15px;
-    }
-    
-    .last-message {
-        font-size: 13px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100%;
-    }
-    
-    .unread-badge {
-        top: 50%;
-        right: 40px;
-        transform: translateY(-50%);
-    }
-    
-    /* Область чата - скрыта по умолчанию */
     .chat-area {
-        display: none !important;
+        min-height: 500px;
+    }
+}
+
+/* Мобильная адаптация - ОСНОВНЫЕ ИСПРАВЛЕНИЯ */
+@media (max-width: 768px) {
+    /* Фиксированный чат на весь экран */
+    .chat-area {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        z-index: 1100;
+        z-index: 1000;
         background: var(--white);
         border-radius: 0;
+        display: flex;
         flex-direction: column;
         transform: translateX(100%);
         transition: transform 0.3s ease;
     }
     
-    /* Когда чат активен */
     .chat-area.chat-active {
-        display: flex !important;
         transform: translateX(0);
-        animation: slideInRight 0.3s ease;
+        display: flex !important;
     }
     
-    @keyframes slideInRight {
-        from {
-            transform: translateX(100%);
-        }
-        to {
-            transform: translateX(0);
-        }
+    .chat-area:not(.chat-active) {
+        display: none !important;
     }
     
-    @keyframes slideOutRight {
-        from {
-            transform: translateX(0);
-        }
-        to {
-            transform: translateX(100%);
-        }
+    /* Скрываем сайдбар когда открыт чат */
+    .chat-area.chat-active ~ .sidebar {
+        display: none !important;
     }
     
     /* Шапка чата на мобильных */
     .chat-header {
-        padding: 12px 16px;
-        background: var(--white);
-        border-bottom: 1px solid var(--lighter-gray);
-        min-height: 60px;
+        padding: 14px 16px;
+        background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        min-height: 70px;
         position: sticky;
         top: 0;
         z-index: 10;
     }
     
+    .chat-partner-info h2 {
+        color: white !important;
+        font-size: 18px;
+    }
+    
+    .status {
+        color: rgba(255, 255, 255, 0.8) !important;
+        font-size: 13px;
+    }
+    
+    .chat-partner-info .avatar {
+        border-color: white !important;
+    }
+    
+    #delete-chat-btn {
+        color: white !important;
+        opacity: 0.8;
+    }
+    
+    #delete-chat-btn:hover {
+        color: #ff6b6b !important;
+        opacity: 1;
+    }
+    
     /* Кнопка "Назад" в чате */
     .mobile-back-button {
+        display: none !important;
+    }
+    
+    .chat-area.chat-active .mobile-back-button {
         display: flex !important;
         align-items: center;
         justify-content: center;
         width: 40px;
         height: 40px;
-        background: transparent !important;
-        color: var(--primary-gray) !important;
-        border: none !important;
+        background: rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
         border-radius: 50%;
-        font-size: 18px;
+        font-size: 16px;
         cursor: pointer;
         transition: all 0.3s;
         margin-right: 12px;
@@ -1721,54 +1609,18 @@ body {
     }
     
     .mobile-back-button:hover {
-        background: var(--lighter-gray) !important;
+        background: rgba(255, 255, 255, 0.3) !important;
+        transform: scale(1.05);
     }
     
-    .chat-partner-info h2 {
-        color: var(--primary-gray) !important;
-        font-size: 18px;
-    }
-    
-    .status {
-        color: var(--light-gray) !important;
-        font-size: 13px;
-    }
-    
-    .chat-partner-info .avatar {
-        border-color: var(--light-gray) !important;
-        width: 40px;
-        height: 40px;
-        font-size: 16px;
-    }
-    
-    #delete-chat-btn {
-        color: var(--error) !important;
-        opacity: 0.8;
-    }
-    
-    #delete-chat-btn:hover {
-        color: var(--error) !important;
-        opacity: 1;
-    }
-    
-    /* Сообщения */
+    /* Сообщения с отступом для клавиатуры */
     .chat-messages {
         flex: 1;
+        overflow-y: auto;
         padding: 16px;
-        padding-bottom: 180px !important;
+        padding-bottom: 180px !important; /* Большой отступ снизу для клавиатуры */
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
-        height: calc(100vh - 120px);
-    }
-    
-    .message {
-        max-width: 85%;
-        padding: 12px 16px;
-    }
-    
-    .message-text {
-        font-size: 15px;
-        line-height: 1.5;
     }
     
     /* Поле ввода фиксировано внизу */
@@ -1781,16 +1633,16 @@ body {
         border-top: 1px solid var(--lighter-gray);
         padding: 12px 16px;
         z-index: 1001;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
         display: flex !important;
         gap: 10px;
         align-items: center;
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
     }
     
     .chat-input-container input {
         flex: 1;
         padding: 12px 16px;
-        font-size: 16px !important;
+        font-size: 16px !important; /* Предотвращаем масштабирование в iOS */
         border-radius: 20px;
         min-height: 44px;
         max-height: 100px;
@@ -1820,6 +1672,94 @@ body {
         display: none;
     }
     
+    /* Контейнер приложения */
+    .container {
+        padding: 0 16px;
+    }
+    
+    .app-container {
+        flex-direction: column;
+        height: calc(100vh - 60px);
+        margin-top: 0;
+        gap: 0;
+    }
+    
+    /* Сайдбар на мобильных */
+    .sidebar {
+        width: 100%;
+        border-radius: 0;
+        height: 100%;
+        overflow-y: auto;
+        display: block !important;
+    }
+    
+    /* Навигация на мобильных */
+    .navbar {
+        padding: 12px 0;
+        min-height: 60px;
+    }
+    
+    .nav-logo span {
+        display: none;
+    }
+    
+    .nav-links {
+        gap: 12px;
+    }
+    
+    .user-info span {
+        display: none;
+    }
+    
+    .nav-links button span {
+        display: none;
+    }
+    
+    .nav-links button {
+        padding: 10px;
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .nav-links button i {
+        margin: 0;
+        font-size: 18px;
+    }
+    
+    #logout-btn span {
+        display: none;
+    }
+    
+    /* Кнопка удаления аккаунта на мобильных */
+    #delete-account-btn {
+        font-size: 0;
+        padding: 10px;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    #delete-account-btn i {
+        font-size: 16px;
+        margin: 0;
+    }
+    
+    /* Сообщения */
+    .message {
+        max-width: 85%;
+        padding: 12px 16px;
+    }
+    
+    .message-text {
+        font-size: 15px;
+        line-height: 1.5;
+    }
+    
     /* Результаты поиска */
     .search-results {
         position: fixed;
@@ -1831,6 +1771,10 @@ body {
         z-index: 1001;
     }
     
+    .search-container {
+        position: static;
+    }
+    
     /* Уведомления */
     .notification {
         left: 16px;
@@ -1839,80 +1783,31 @@ body {
         min-width: auto;
         max-width: none;
     }
-}
-
-/* Адаптивность для очень маленьких экранов */
-@media (max-width: 480px) {
-    .user-profile {
-        padding: 12px;
+    
+    /* Профиль на мобильных */
+    .profile-container {
+        margin: 20px auto;
+        padding: 20px;
     }
     
-    .avatar.medium {
-        width: 50px;
-        height: 50px;
-        font-size: 20px;
+    .profile-header h1 {
+        font-size: 24px;
     }
     
-    .user-details h3 {
-        font-size: 14px;
+    .profile-avatar-container {
+        width: 120px;
+        height: 120px;
     }
     
-    .user-details p {
-        font-size: 11px;
-    }
-    
-    .chat-item {
-        padding: 12px;
-    }
-    
-    .chat-header-info h4 {
-        font-size: 14px;
-    }
-    
-    .last-message {
-        font-size: 12px;
-    }
-    
-    .message {
-        max-width: 90%;
-        padding: 10px 14px;
-    }
-    
-    .chat-input-container {
-        padding: 10px;
-        gap: 8px;
-    }
-    
-    .chat-input-container input {
-        padding: 10px 12px;
+    .profile-field input,
+    .profile-field textarea {
+        padding: 12px 14px;
         font-size: 16px;
     }
     
-    .chat-input-container .btn-icon {
-        padding: 8px;
-        width: 40px;
-        height: 40px;
-    }
-    
-    .chat-input-container .btn-primary {
-        padding: 10px;
-        width: 40px;
-        height: 40px;
-    }
-    
-    .mobile-back-button {
-        width: 36px;
-        height: 36px;
-        font-size: 16px;
-        margin-right: 8px;
-    }
-    
-    .chat-partner-info h2 {
-        font-size: 16px;
-    }
-    
-    .chat-messages {
-        padding-bottom: 160px !important;
+    .btn-danger, .btn-secondary-outline {
+        padding: 12px 20px;
+        font-size: 15px;
     }
 }
 
@@ -2433,7 +2328,96 @@ body {
     font-size: 20px;
 }
 
-/* Дополнительные исправления для предотвращения масштабирования на iOS */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Адаптивность для очень маленьких экранов */
+@media (max-width: 480px) {
+    .avatar.medium {
+        width: 60px;
+        height: 60px;
+        font-size: 20px;
+    }
+    
+    .chat-item {
+        padding: 12px;
+    }
+    
+    .message {
+        max-width: 90%;
+        padding: 12px 16px;
+    }
+    
+    .chat-input-container {
+        padding: 10px;
+        gap: 8px;
+    }
+    
+    .chat-input-container input {
+        padding: 10px 12px;
+        font-size: 16px;
+    }
+    
+    .chat-input-container .btn-icon {
+        padding: 8px;
+        width: 40px;
+        height: 40px;
+    }
+    
+    .chat-input-container .btn-primary {
+        padding: 10px;
+        width: 40px;
+        height: 40px;
+    }
+    
+    .nav-links {
+        gap: 8px;
+    }
+    
+    .nav-links button {
+        padding: 8px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+    
+    .mobile-back-button {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+        margin-right: 8px;
+    }
+    
+    .chat-messages {
+        padding-bottom: 200px !important;
+    }
+    
+    .profile-container {
+        padding: 16px;
+    }
+    
+    .form-section {
+        padding: 16px;
+    }
+}
+
+/* Дополнительные стили для предотвращения масштабирования на iOS */
 @supports (-webkit-touch-callout: none) {
     input, textarea {
         font-size: 16px !important;
@@ -2449,6 +2433,18 @@ body {
     
     button, a {
         user-select: none;
+    }
+}
+
+/* Анимация появления чата */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
     }
 }
 
@@ -2481,69 +2477,5 @@ body {
 @media (max-height: 600px) and (max-width: 768px) {
     .chat-messages {
         padding-bottom: 220px !important;
-    }
-    
-    .chats-list {
-        height: calc(100vh - 160px);
-    }
-}
-
-/* Профиль на мобильных */
-@media (max-width: 768px) {
-    .profile-container {
-        margin: 20px auto;
-        padding: 20px;
-    }
-    
-    .profile-header h1 {
-        font-size: 24px;
-    }
-    
-    .profile-avatar-container {
-        width: 120px;
-        height: 120px;
-    }
-    
-    .profile-field input,
-    .profile-field textarea {
-        padding: 12px 14px;
-        font-size: 16px;
-    }
-    
-    .btn-danger, .btn-secondary-outline {
-        padding: 12px 20px;
-        font-size: 15px;
-    }
-    
-    #delete-account-btn {
-        font-size: 0;
-        padding: 10px;
-        width: 44px;
-        height: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    #delete-account-btn i {
-        font-size: 16px;
-        margin: 0;
-    }
-}
-
-/* Профиль на очень маленьких экранах */
-@media (max-width: 480px) {
-    .profile-container {
-        padding: 16px;
-        margin: 10px;
-    }
-    
-    .form-section {
-        padding: 16px;
-    }
-    
-    .profile-avatar-container {
-        width: 100px;
-        height: 100px;
     }
 }
