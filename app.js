@@ -1293,20 +1293,7 @@ class REonikaMessenger {
     showImagePreview() {
         if (!this.imagePreviewUrl || !this.currentImageFile) return;
         
-        let previewOverlay = document.getElementById('image-preview-overlay');
-        if (!previewOverlay && this.isMobile) {
-            previewOverlay = document.createElement('div');
-            previewOverlay.id = 'image-preview-overlay';
-            previewOverlay.className = 'image-preview-overlay';
-            document.body.appendChild(previewOverlay);
-            
-            // Закрываем по клику на оверлей
-            previewOverlay.addEventListener('click', (e) => {
-                if (e.target === previewOverlay) {
-                    this.removeImagePreview();
-                }
-            });
-        }
+
         let previewContainer = document.getElementById('image-preview-container');
         
         if (!previewContainer) {
