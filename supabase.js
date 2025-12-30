@@ -1,62 +1,39 @@
-// supabase/functions/send-push-notification/index.js
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import webpush from 'https://esm.sh/web-push@3.6.1'
+// supabase.js - исправленная версия
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const SUPABASE_URL = 'https://khosjiirbcxkgbpwsgmx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtob3NqaWlyYmN4a2dicHdzZ214Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjM4MTQ5MCwiZXhwIjoyMDgxOTU3NDkwfQ.9O0CiAQCkl7CluomZhiLk1R82p4gMbD1ns69InzVVZM';
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-
-  try {
-    const { subscription, title, body, data } = await req.json()
-
-    // Установите свои VAPID ключи
-    const vapidKeys = {
-      publicKey: Deno.env.get('BPne5W8Q840JJ6b9oEGZXc0SSgVd5WfYLUk83yC69ZVnRhJOJ2kEQsT3wjKYKUMqL7Ei9twJNmGetaej5oNUNWw'),
-      privateKey: Deno.env.get('iNJhzXElz6_ZiIMgywFzYaTLRHq422DsOenKvdc8RYE')
+// Создаем клиент Supabase
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    storage: {
+      getItem: (key) => {
+        try {
+          return JSON.parse(localStorage.getItem(key));
+        } catch (error) {
+          return null;
+        }
+      },
+      setItem: (key, value) => {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch (error) {
+          console.warn('LocalStorage setItem error:', error);
+        }
+      },
+      removeItem: (key) => {
+        try {
+          localStorage.removeItem(key);
+        } catch (error) {
+          console.warn('LocalStorage removeItem error:', error);
+        }
+      }
     }
-
-    webpush.setVapidDetails(
-      'mailto:your-email@example.com',
-      vapidKeys.publicKey,
-      vapidKeys.privateKey
-    )
-
-    // Отправляем push-уведомление
-    await webpush.sendNotification(
-      subscription,
-      JSON.stringify({
-        title,
-        body,
-        icon: '/icon-192x192.png',
-        data: data || {},
-        vibrate: [200, 100, 200]
-      })
-    )
-
-    return new Response(
-      JSON.stringify({ success: true }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    )
-
-  } catch (error) {
-    console.error('Error sending push notification:', error)
-    
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    )
   }
-})
+});
+
+export { supabase };

@@ -223,182 +223,65 @@ class MobileREonikaEnhancements {
             const style = document.createElement('style');
             style.id = 'mobile-styles';
             style.textContent = `
-                .mobile-back-button {
-                    display: none !important;
-                    align-items: center;
-                    justify-content: center;
-                    width: 44px;
-                    height: 44px;
-                    background: var(--primary-gray) !important;
-                    color: white !important;
-                    border: 2px solid rgba(255, 255, 255, 0.2) !important;
-                    border-radius: 50%;
-                    font-size: 18px;
-                    cursor: pointer;
-                    transition: all 0.3s;
-                    margin-right: 12px;
-                    flex-shrink: 0;
-                    z-index: 100;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-                    position: relative;
-                }
-                
-                .mobile-back-button::after {
-                    content: 'Назад к чатам';
-                    position: absolute;
-                    left: 50px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    background: rgba(0, 0, 0, 0.8);
-                    color: white;
-                    padding: 6px 10px;
-                    border-radius: 6px;
-                    font-size: 12px;
-                    white-space: nowrap;
-                    opacity: 0;
-                    pointer-events: none;
-                    transition: opacity 0.3s;
-                    z-index: 101;
-                }
-                
-                .mobile-back-button:hover::after {
-                    opacity: 1;
-                }
-                
-                .mobile-back-button:hover {
-                    background: var(--secondary-gray) !important;
-                    transform: scale(1.05);
-                    border-color: rgba(255, 255, 255, 0.4) !important;
-                }
-                
-                .mobile-back-button:active {
-                    transform: scale(0.95);
-                }
+                /* ... существующие стили ... */
                 
                 @media (max-width: 768px) {
-                    .chat-area.chat-active .mobile-back-button {
-                        display: flex !important;
+                    .chat-input-container {
+                        padding: 16px 24px !important;
+                        gap: 12px !important;
                     }
                     
-                    .chat-header {
-                        padding: 12px 16px;
+                    .chat-input-container .btn-icon {
+                        width: 48px !important;
+                        height: 48px !important;
+                        padding: 12px !important;
+                        margin: 0 4px !important;
+                        border-radius: 12px !important;
+                        border: 2px solid var(--border-gray) !important;
+                        background: var(--white) !important;
+                        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+                    }
+                    
+                    .chat-input-container .btn-primary {
+                        width: 48px !important;
+                        height: 48px !important;
+                        padding: 12px !important;
+                        margin-left: 4px !important;
+                        border-radius: 12px !important;
                         background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray)) !important;
-                        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                    }
-                    
-                    .chat-partner-info h2 {
-                        color: white !important;
-                        font-size: 18px;
-                    }
-                    
-                    .status {
-                        color: rgba(255, 255, 255, 0.8) !important;
-                        font-size: 13px;
-                    }
-                    
-                    .chat-partner-info .avatar {
-                        border-color: white !important;
-                    }
-                    
-                    #delete-chat-btn {
-                        color: white !important;
-                        opacity: 0.8;
-                    }
-                    
-                    #delete-chat-btn:hover {
-                        color: #ff6b6b !important;
-                        opacity: 1;
-                    }
-                    
-                    .btn-primary, .btn-icon, .chat-item {
-                        min-height: 44px;
-                        min-width: 44px;
-                    }
-                    
-                    .btn-icon {
-                        padding: 12px;
-                    }
-                    
-                    .message-text {
-                        font-size: 16px;
-                        line-height: 1.6;
+                        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
                     }
                     
                     #message-input {
-                        font-size: 16px;
+                        padding: 14px 18px !important;
+                        border-radius: 12px !important;
+                        font-size: 16px !important;
+                        border: 2px solid var(--border-gray) !important;
+                        background: var(--white) !important;
+                        margin: 0 4px !important;
                     }
                     
-                    .chat-messages {
-                        -webkit-overflow-scrolling: touch;
-                        overscroll-behavior: contain;
-                        padding-bottom: 180px !important;
+                    .nav-links {
+                        gap: 16px !important;
+                        padding-right: 12px !important;
                     }
                     
-                    /* Стили для скрытия сайдбара при открытом чате */
-                    .chat-area.chat-active ~ .sidebar {
-                        display: none !important;
-                    }
-                    
-                    /* Стили для отображения чата на весь экран */
-                    .chat-area {
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        z-index: 1000;
-                        background: white;
-                        transform: translateX(100%);
-                        transition: transform 0.3s ease;
-                    }
-                    
-                    .chat-area.chat-active {
-                        transform: translateX(0);
-                    }
-                    
-                    /* Поле ввода фиксировано внизу */
-                    .chat-input-container {
-                        position: fixed;
-                        bottom: 0;
-                        left: 0;
-                        right: 0;
-                        background: white;
-                        border-top: 1px solid var(--lighter-gray);
-                        padding: 12px 16px;
-                        z-index: 1001;
-                        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-                    }
-                }
-                
-                @media (max-width: 360px) {
-                    .mobile-back-button {
-                        width: 40px;
-                        height: 40px;
-                        font-size: 16px;
-                        margin-right: 8px;
-                    }
-                    
-                    .mobile-back-button::after {
-                        display: none;
-                    }
-                    
-                    .chat-partner-info h2 {
-                        font-size: 16px;
-                    }
-                    
-                    .chat-input-container {
-                        padding: 10px;
-                    }
-                    
-                    .chat-messages {
-                        padding-bottom: 180px !important;
+                    #logout-btn {
+                        padding: 12px !important;
+                        min-width: 48px !important;
+                        min-height: 48px !important;
+                        border-radius: 10px !important;
+                        background: linear-gradient(135deg, #e53e3e, #f56565) !important;
+                        color: white !important;
+                        border: none !important;
+                        margin-left: 4px !important;
                     }
                 }
             `;
             document.head.appendChild(style);
         }
     }
-    
+
     async requestPermissions() {
         if (!this.messenger.isMobile) return;
         

@@ -27,7 +27,7 @@ class REonikaMessenger {
         this.messages = [];
         this.onlineUsers = new Set();
         this.voiceMessages = new Map();
-        this.initServiceWorker();
+        
         this.currentImageFile = null;
         this.imagePreviewUrl = null;
         this.voiceRecordingTimeout = null;        
@@ -48,8 +48,6 @@ class REonikaMessenger {
         this.initAuthStateListener(); 
         this.autoLogin(); 
         
-
-        
         window.addEventListener('resize', () => {
             this.isMobile = window.innerWidth <= 768;
             this.updateChatUI();
@@ -68,23 +66,6 @@ class REonikaMessenger {
                 console.log('Мобильные улучшения интегрированы');
             }
         }, 500);
-    }
-
-    initServiceWorker() {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.addEventListener('message', (event) => {
-                if (event.data && event.data.type === 'OPEN_CHAT') {
-                    const chatId = event.data.chatId;
-                    // Найти и открыть чат
-                    this.loadChats().then(() => {
-                        const chat = this.chats.find(c => c.id === chatId);
-                        if (chat) {
-                            this.selectChat(chat);
-                        }
-                    });
-                }
-            });
-        }
     }
 
     initAuthStateListener() {
