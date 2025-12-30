@@ -2783,3 +2783,224 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
 .btn-primary i, .nav-links button.active i {
     color: #ffffff;
 }
+
+/* Мобильная адаптация окна превью изображений */
+@media (max-width: 768px) {
+    .image-preview-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90vw;
+        max-width: 500px;
+        max-height: 80vh;
+        bottom: auto;
+        overflow-y: auto;
+        z-index: 2000;
+        padding: 16px;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        background: var(--white);
+        border: 1px solid var(--border-gray);
+        animation: mobilePreviewIn 0.3s ease;
+    }
+    
+    @keyframes mobilePreviewIn {
+        from {
+            opacity: 0;
+            transform: translate(-50%, -40%);
+        }
+        to {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+        }
+    }
+    
+    .image-preview {
+        position: relative;
+        margin-bottom: 16px;
+        max-height: 50vh;
+        overflow: hidden;
+        border-radius: 12px;
+    }
+    
+    .image-preview img {
+        width: 100%;
+        height: auto;
+        max-height: 50vh;
+        object-fit: contain;
+        border-radius: 12px;
+        background: var(--background-gray);
+    }
+    
+    .image-preview-remove {
+        top: 10px;
+        right: 10px;
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+        background: rgba(229, 62, 62, 0.9);
+        backdrop-filter: blur(5px);
+    }
+    
+    .image-preview-actions {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    #image-caption {
+        width: 100%;
+        padding: 14px 16px;
+        font-size: 16px;
+        border-radius: 12px;
+        border: 2px solid var(--border-gray);
+        background: var(--white);
+        color: var(--primary-dark);
+        margin: 0;
+        box-sizing: border-box;
+    }
+    
+    #image-caption:focus {
+        outline: none;
+        border-color: var(--primary-gray);
+        box-shadow: 0 0 0 3px rgba(45, 55, 72, 0.1);
+    }
+    
+    #send-image-btn, 
+    #cancel-image-btn {
+        width: 100%;
+        padding: 16px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin: 0;
+        cursor: pointer;
+        transition: all 0.3s;
+        border: none;
+    }
+    
+    #send-image-btn {
+        background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
+        color: var(--white);
+    }
+    
+    #send-image-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(45, 55, 72, 0.2);
+    }
+    
+    #cancel-image-btn {
+        background: var(--lighter-gray);
+        color: var(--primary-gray);
+        border: 1px solid var(--border-gray);
+    }
+    
+    #cancel-image-btn:hover {
+        background: var(--light-gray);
+        color: var(--white);
+    }
+    
+    .image-preview-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+    
+    /* Оверлей для превью */
+    .image-preview-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1999;
+        backdrop-filter: blur(5px);
+        animation: fadeIn 0.3s ease;
+    }
+}
+
+/* Дополнительные улучшения для очень маленьких экранов */
+@media (max-width: 480px) {
+    .image-preview-container {
+        width: 95vw;
+        padding: 14px;
+    }
+    
+    .image-preview {
+        max-height: 45vh;
+    }
+    
+    .image-preview img {
+        max-height: 45vh;
+    }
+    
+    .image-preview-remove {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+    
+    #image-caption {
+        padding: 12px 14px;
+        font-size: 15px;
+    }
+    
+    #send-image-btn, 
+    #cancel-image-btn {
+        padding: 14px;
+        font-size: 15px;
+    }
+}
+
+/* Для портретной ориентации на смартфонах */
+@media (max-height: 700px) and (max-width: 768px) {
+    .image-preview-container {
+        max-height: 70vh;
+        top: 45%;
+    }
+    
+    .image-preview {
+        max-height: 40vh;
+    }
+    
+    .image-preview img {
+        max-height: 40vh;
+    }
+}
+
+/* Для ландшафтной ориентации на мобильных */
+@media (max-height: 500px) and (orientation: landscape) {
+    .image-preview-container {
+        width: 70vw;
+        max-height: 85vh;
+        top: 50%;
+    }
+    
+    .image-preview {
+        max-height: 55vh;
+    }
+    
+    .image-preview img {
+        max-height: 55vh;
+    }
+    
+    .image-preview-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    #image-caption {
+        width: 100%;
+    }
+    
+    #send-image-btn, 
+    #cancel-image-btn {
+        width: calc(50% - 5px);
+    }
+}
