@@ -43,111 +43,46 @@ class MobileREonikaEnhancements {
         this.addMobileBackButtonStyles();
     }
     
-// В методе closeMobileChat() заменить:
-closeMobileChat() {
-    if (this.messenger.isMobile && this.messenger.currentChat) {
-        const chatArea = document.getElementById('chat-area');
-        const sidebar = document.querySelector('.sidebar');
-        
-        if (chatArea) {
-            chatArea.classList.remove('chat-active');
-            // Возвращаем нормальное позиционирование
-            chatArea.style.position = '';
-            chatArea.style.top = '';
-            chatArea.style.left = '';
-            chatArea.style.right = '';
-            chatArea.style.bottom = '';
-        }
-        
-        if (sidebar) {
-            sidebar.style.display = 'block';
-        }
-        
-        this.messenger.currentChat = null;
-        this.messenger.updateChatUI();
-        
-        // Прокручиваем к началу
-        setTimeout(() => {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }, 100);
-    }
-}
-
-    // В методе addMobileBackButtonStyles() обновить:
-    addMobileBackButtonStyles() {
-        if (!document.getElementById('mobile-styles')) {
-            const style = document.createElement('style');
-            style.id = 'mobile-styles';
-            style.textContent = `
-                @media (max-width: 768px) {
-                    /* Фиксированный чат только когда активен */
-                    .chat-area {
-                        position: relative;
-                        height: auto;
-                        min-height: 400px;
-                        margin-bottom: 20px;
-                        transform: none;
-                    }
-                    
-                    .chat-area.chat-active {
-                        position: fixed !important;
-                        top: 0 !important;
-                        left: 0 !important;
-                        right: 0 !important;
-                        bottom: 0 !important;
-                        z-index: 1000 !important;
-                        transform: translateX(0) !important;
-                        border-radius: 0 !important;
-                        margin: 0 !important;
-                    }
-                    
-                    /* sidebar всегда виден кроме активного чата */
-                    .chat-area.chat-active ~ .sidebar {
-                        display: none !important;
-                    }
-                    
-                    .sidebar {
-                        display: block !important;
-                        position: relative !important;
-                        height: auto !important;
-                        max-height: none !important;
-                    }
-                    
-                    /* Контейнер ввода на фиксированной позиции только в активном чате */
-                    .chat-area .chat-input-container {
-                        position: relative;
-                        padding: 16px;
-                    }
-                    
-                    .chat-area.chat-active .chat-input-container {
-                        position: fixed;
-                        bottom: 0;
-                        left: 0;
-                        right: 0;
-                        padding: 10px 12px;
-                    }
-                }
-                
-                @media (max-width: 360px) {
-                    .chat-input-container {
-                        gap: 6px;
-                    }
-                    
-                    .chat-input-container input {
-                        min-width: 0;
-                        flex: 1 1 auto;
-                    }
-                    
-                    /* Скрываем лишние кнопки на очень маленьких экранах */
-                    label[for="image-upload"] {
-                        display: none;
-                    }
-                }
+    closeMobileChat() {
+        if (this.messenger.isMobile && this.messenger.currentChat) {
+            const chatArea = document.getElementById('chat-area');
+            const sidebar = document.querySelector('.sidebar');
+            
+            if (chatArea) {
+                chatArea.classList.remove('chat-active');
+            }
+            
+            if (sidebar) {
+                sidebar.style.display = 'block';
+            }
+            
+            this.messenger.currentChat = null;
+            this.messenger.updateChatUI();
+            
+            // Скрываем интерфейс чата
+            const chatHeader = document.getElementById('chat-header');
+            const chatInputContainer = document.getElementById('chat-input-container');
+            const noChatSelected = document.querySelector('.no-chat-selected');
+            const messagesContainer = document.getElementById('messages-container');
+            
+            if (chatHeader) chatHeader.style.display = 'none';
+            if (chatInputContainer) chatInputContainer.style.display = 'none';
+            if (noChatSelected) noChatSelected.style.display = 'flex';
+            if (messagesContainer) messagesContainer.innerHTML = `
+                <div class="no-chat-selected">
+                    <i class="fas fa-comments"></i>
+                    <p>Выберите чат для начала общения</p>
+                </div>
             `;
-            document.head.appendChild(style);
+            
+            this.messenger.showNotification('Вернулись к списку чатов', 'info');
+            
+            setTimeout(() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 100);
         }
     }
-
+    
     fixMessageScrolling() {
         const originalRenderMessages = this.messenger.renderMessages;
         const originalSelectChat = this.messenger.selectChat;
