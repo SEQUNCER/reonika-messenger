@@ -27,7 +27,7 @@ class REonikaMessenger {
         this.messages = [];
         this.onlineUsers = new Set();
         this.voiceMessages = new Map();
-        
+        this.initServiceWorker();
         this.currentImageFile = null;
         this.imagePreviewUrl = null;
         this.voiceRecordingTimeout = null;        
@@ -48,6 +48,8 @@ class REonikaMessenger {
         this.initAuthStateListener(); 
         this.autoLogin(); 
         
+
+        
         window.addEventListener('resize', () => {
             this.isMobile = window.innerWidth <= 768;
             this.updateChatUI();
@@ -66,6 +68,23 @@ class REonikaMessenger {
                 console.log('Мобильные улучшения интегрированы');
             }
         }, 500);
+    }
+
+    initServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'OPEN_CHAT') {
+                    const chatId = event.data.chatId;
+                    // Найти и открыть чат
+                    this.loadChats().then(() => {
+                        const chat = this.chats.find(c => c.id === chatId);
+                        if (chat) {
+                            this.selectChat(chat);
+                        }
+                    });
+                }
+            });
+        }
     }
 
     initAuthStateListener() {
@@ -480,55 +499,6 @@ class REonikaMessenger {
         });
         this.realtimeSubscriptions = [];
 
-        const notificationsChannel = supabase
-            .channel('notifications')
-            .on('postgres_changes', 
-                { 
-                    event: 'INSERT', 
-                    schema: 'public', 
-                    table: 'messages' 
-                }, 
-                async (payload) => {
-                    // Проверяем, адресовано ли сообщение текущему пользователю
-                    const chat = this.chats.find(c => c.id === payload.new.chat_id);
-                    if (chat) {
-                        const isForCurrentUser = chat.user1_id === this.currentUser?.id || 
-                                            chat.user2_id === this.currentUser?.id;
-                        
-                        if (isForCurrentUser && payload.new.sender_id !== this.currentUser?.id) {
-                            // Показываем уведомление
-                            if (window.notifications) {
-                                const { data: sender } = await supabase
-                                    .from('profiles')
-                                    .select('username, avatar_url')
-                                    .eq('id', payload.new.sender_id)
-                                    .single();
-                                
-                                if (sender) {
-                                    const notification = {
-                                        id: `msg_${payload.new.id}`,
-                                        type: 'new_message',
-                                        title: 'Новое сообщение',
-                                        content: payload.new.content || '📎 Вложение',
-                                        sender: sender,
-                                        chatId: payload.new.chat_id,
-                                        messageId: payload.new.id,
-                                        timestamp: new Date().toISOString(),
-                                        read: false
-                                    };
-                                    
-                                    window.notifications.addNotification(notification);
-                                }
-                            }
-                        }
-                    }
-                }
-            )
-            .subscribe();
-
-        this.realtimeSubscriptions.push(notificationsChannel);
-    
-        
         const messagesChannel = supabase
             .channel('messages')
             .on('postgres_changes', 
