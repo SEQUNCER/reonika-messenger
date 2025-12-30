@@ -1,6 +1,3 @@
-/* REonika - Современный мессенджер со статичной серой цветовой схемой */
-
-/* Общие стили */
 * {
     margin: 0;
     padding: 0;
@@ -9,7 +6,6 @@
 }
 
 :root {
-    /* Основная серая палитра */
     --primary-dark: #1a202c;
     --primary-gray: #2d3748;
     --secondary-gray: #4a5568;
@@ -19,31 +15,22 @@
     --lightest-gray: #e2e8f0;
     --background-gray: #f7fafc;
     --white: #ffffff;
-    
-    /* Акцентные цвета в серых тонах */
     --accent-dark: #1a202c;
     --accent-gray: #2d3748;
     --accent-light: #4a5568;
-    
-    /* Статусные цвета в серых тонах */
     --online: #38a169;
     --offline: #a0aec0;
     --success: #48bb78;
     --error: #f56565;
     --warning: #ed8936;
-    
-    /* Дополнительные серые оттенки */
     --border-gray: #e2e8f0;
     --hover-gray: #edf2f7;
     --active-gray: #e2e8f0;
     --shadow-gray: rgba(0, 0, 0, 0.1);
-    
-    /* Голосовые сообщения */
     --voice-recording: #e53e3e;
     --voice-playing: #38a169;
 }
 
-/* Отключаем темную тему системы */
 @media (prefers-color-scheme: dark) {
     body {
         color-scheme: light only;
@@ -64,7 +51,6 @@ body {
     padding: 0 20px;
 }
 
-/* Утилиты */
 .hidden {
     display: none !important;
 }
@@ -73,7 +59,6 @@ body {
     display: block !important;
 }
 
-/* Стиль для временных сообщений */
 .message.temporary {
     opacity: 0.8;
     animation: pulse-temporary 1.5s infinite;
@@ -88,7 +73,6 @@ body {
     color: var(--medium-gray);
 }
 
-/* Индикатор отправки */
 .message-sending {
     display: flex;
     align-items: center;
@@ -119,7 +103,6 @@ body {
     50% { opacity: 1; }
 }
 
-/* Индикатор загрузки */
 .loading-overlay {
     position: fixed;
     top: 0;
@@ -165,7 +148,6 @@ body {
     font-weight: 500;
 }
 
-/* Кнопки - Серая тема */
 .btn-primary {
     background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
     color: var(--white);
@@ -220,7 +202,6 @@ body {
     color: var(--white);
 }
 
-/* Кнопка удаления аккаунта */
 #delete-account-btn {
     background: linear-gradient(135deg, #c53030, #e53e3e);
     color: white;
@@ -266,7 +247,6 @@ body {
     transform: scale(0.95);
 }
 
-/* Кнопка удаления чата */
 #delete-chat-btn {
     color: #e53e3e;
     transition: all 0.3s;
@@ -277,7 +257,6 @@ body {
     transform: scale(1.1);
 }
 
-/* Кнопка удаления сообщения */
 .delete-message-btn {
     margin-left: 8px;
     padding: 4px 6px;
@@ -292,7 +271,6 @@ body {
     background-color: rgba(229, 62, 62, 0.1);
 }
 
-/* Кнопка удаления контакта */
 .delete-contact-btn {
     position: absolute;
     top: 5px;
@@ -322,7 +300,6 @@ body {
     transform: scale(1.2);
 }
 
-/* Экран аутентификации - Серая тема */
 #auth-screen {
     display: block;
     background: linear-gradient(135deg, var(--background-gray), var(--lightest-gray));
@@ -448,7 +425,6 @@ body {
     border-bottom-color: var(--primary-gray);
 }
 
-/* Стили для мобильных устройств */
 @media (max-width: 768px) {
     .form-container {
         padding: 32px 24px;
@@ -482,7 +458,6 @@ body {
     }
 }
 
-/* Для очень маленьких экранов */
 @media (max-width: 480px) {
     .form-container {
         padding: 28px 20px;
@@ -506,7 +481,6 @@ body {
     min-height: 100vh;
 }
 
-/* Основной интерфейс */
 .app-container {
     display: flex;
     height: calc(100vh - 70px);
@@ -514,7 +488,6 @@ body {
     gap: 20px;
 }
 
-/* Боковая панель */
 .sidebar {
     width: 320px;
     background: var(--white);
@@ -597,7 +570,6 @@ body {
     min-width: 50px;
 }
 
-/* Результаты поиска */
 .search-results {
     position: absolute;
     top: 100%;
@@ -699,7 +671,6 @@ body {
     padding: 8px;
 }
 
-/* Список чатов */
 .chats-list {
     flex: 1;
     overflow-y: auto;
@@ -804,7 +775,6 @@ body {
     animation: pulse 2s infinite;
 }
 
-/* Область чата */
 .chat-area {
     flex: 1;
     display: flex;
@@ -928,7 +898,6 @@ body {
     margin-top: 8px;
 }
 
-/* Стиль для удаленных сообщений */
 .message.deleted .message-text {
     opacity: 0.6;
     font-style: italic;
@@ -1018,7 +987,6 @@ body {
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
-/* Голосовые сообщения */
 .voice-message {
     display: flex;
     align-items: center;
@@ -1152,7 +1120,6 @@ body {
     background: rgba(245, 101, 101, 0.1);
 }
 
-/* Индикатор времени жизни сообщения */
 .message-expiry {
     font-size: 10px;
     opacity: 0.6;
@@ -1246,7 +1213,6 @@ body {
     margin-bottom: 12px;
 }
 
-/* Модальное окно для изображений */
 .image-modal {
     position: fixed;
     top: 0;
@@ -1320,7 +1286,6 @@ body {
     transform: scale(1.1);
 }
 
-/* Полоса прокрутки */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -1345,7 +1310,6 @@ body {
     background: transparent;
 }
 
-/* Подсказки */
 .tooltip {
     position: relative;
 }
@@ -1379,7 +1343,6 @@ body {
     z-index: 1000;
 }
 
-/* Анимации */
 @keyframes bounce {
     0%, 100% {
         transform: translateY(0);
@@ -1402,9 +1365,7 @@ body {
     }
 }
 
-/* МОБИЛЬНАЯ ВЕРСИЯ - ПОЛНЫЙ ЭКРАН ЧАТОВ */
 @media (max-width: 768px) {
-    /* Фиксируем навигацию сверху */
     .navbar {
         position: fixed;
         top: 0;
@@ -1468,7 +1429,6 @@ body {
         display: none;
     }
     
-    /* Добавляем отступ для контента под навигацией */
     #chats-screen {
         margin-top: 60px;
         height: calc(100vh - 60px);
@@ -1485,7 +1445,6 @@ body {
         padding: 0;
     }
     
-    /* Контейнер приложения - убираем flex, делаем на весь экран */
     .app-container {
         flex-direction: column;
         height: calc(100vh - 60px);
@@ -1495,7 +1454,6 @@ body {
         position: relative;
     }
     
-    /* Сайдбар - полный экран */
     .sidebar {
         width: 100%;
         height: 100%;
@@ -1558,7 +1516,6 @@ body {
         color: var(--white);
     }
     
-    /* Список чатов - полный экран с прокруткой */
     .chats-list {
         flex: 1;
         height: calc(100vh - 180px);
@@ -1568,7 +1525,6 @@ body {
         background: var(--white);
     }
     
-    /* Элементы чата */
     .chat-item {
         margin: 0;
         border-radius: 0;
@@ -1613,7 +1569,6 @@ body {
         transform: translateY(-50%);
     }
     
-    /* Область чата - скрыта по умолчанию */
     .chat-area {
         display: none !important;
         position: fixed;
@@ -1630,7 +1585,6 @@ body {
         border: none;
     }
     
-    /* Когда чат активен */
     .chat-area.chat-active {
         display: flex !important;
         transform: translateX(0);
@@ -1646,7 +1600,6 @@ body {
         }
     }
     
-    /* Шапка чата на мобильных */
     .chat-header {
         padding: 12px 16px;
         background: var(--white);
@@ -1657,7 +1610,6 @@ body {
         z-index: 10;
     }
     
-    /* Кнопка "Назад" в чате */
     .mobile-back-button {
         display: flex !important;
         align-items: center;
@@ -1707,7 +1659,6 @@ body {
         opacity: 1;
     }
     
-    /* Сообщения */
     .chat-messages {
         flex: 1;
         padding: 16px;
@@ -1728,7 +1679,6 @@ body {
         line-height: 1.5;
     }
     
-    /* Поле ввода фиксировано внизу */
     .chat-input-container {
         position: fixed;
         bottom: 0;
@@ -1786,7 +1736,6 @@ body {
         display: none;
     }
     
-    /* Результаты поиска */
     .search-results {
         position: fixed;
         top: auto;
@@ -1799,7 +1748,6 @@ body {
         border: 1px solid var(--border-gray);
     }
     
-    /* Уведомления */
     .notification {
         left: 16px;
         right: 16px;
@@ -1811,7 +1759,6 @@ body {
     }
 }
 
-/* Для очень маленьких экранов */
 @media (max-width: 480px) {
     .user-profile {
         padding: 12px;
@@ -1888,7 +1835,6 @@ body {
     }
 }
 
-/* Кнопка выхода на ПК - серая иконка */
 @media (min-width: 769px) {
     #logout-btn {
         background: var(--white) !important;
@@ -1909,7 +1855,6 @@ body {
     }
 }
 
-/* Контейнер для превью изображения */
 .image-preview-container {
     position: absolute;
     bottom: 80px;
@@ -2000,7 +1945,6 @@ body {
     box-shadow: 0 4px 12px rgba(45, 55, 72, 0.2);
 }
 
-/* Анимация кнопки записи голоса */
 #voice-record-btn.pressed {
     animation: voiceBtnPulse 0.6s ease-in-out infinite alternate;
     background: linear-gradient(135deg, var(--error), #f56565) !important;
@@ -2037,7 +1981,6 @@ body {
     }
 }
 
-/* Индикатор записи голоса - улучшенный */
 .voice-recording-indicator {
     position: fixed;
     top: 50%;
@@ -2088,7 +2031,6 @@ body {
     max-width: 250px;
 }
 
-/* Профиль пользователя */
 .profile-container {
     max-width: 600px;
     margin: 40px auto;
@@ -2315,7 +2257,6 @@ body {
     color: var(--primary-gray);
 }
 
-/* Навигация по экранам */
 .nav-links {
     display: flex;
     align-items: center;
@@ -2347,7 +2288,6 @@ body {
     border-color: var(--primary-gray);
 }
 
-/* Заглушка для сообщений при удалении чата */
 .chat-item.deleted {
     opacity: 0.5;
     pointer-events: none;
@@ -2358,7 +2298,6 @@ body {
     font-style: italic;
 }
 
-/* Модальное окно подтверждения */
 .confirm-modal {
     position: fixed;
     top: 0;
@@ -2440,7 +2379,6 @@ body {
     background: linear-gradient(135deg, #ed8936, #f6ad55);
 }
 
-/* Аватарки */
 .avatar {
     width: 50px;
     height: 50px;
@@ -2491,7 +2429,6 @@ body {
     transform: scale(1.1);
 }
 
-/* Навигация */
 .navbar {
     background-color: var(--white);
     border-bottom: 1px solid var(--border-gray);
@@ -2545,7 +2482,6 @@ body {
     background-color: var(--hover-gray);
 }
 
-/* Уведомления */
 .notification {
     position: fixed;
     top: 20px;
@@ -2590,14 +2526,12 @@ body {
     font-size: 20px;
 }
 
-/* Дополнительные исправления для предотвращения масштабирования на iOS */
 @supports (-webkit-touch-callout: none) {
     input, textarea {
         font-size: 16px !important;
     }
 }
 
-/* Стили для предотвращения выделения при быстром тапе на мобильных */
 @media (max-width: 768px) {
     * {
         -webkit-tap-highlight-color: transparent;
@@ -2609,7 +2543,6 @@ body {
     }
 }
 
-/* Улучшение скроллинга на мобильных */
 @media (max-width: 768px) {
     .chat-messages, .chats-list {
         -webkit-overflow-scrolling: touch;
@@ -2617,7 +2550,6 @@ body {
     }
 }
 
-/* Исправление для кнопки отправки голосового сообщения */
 #voice-record-btn:active {
     transform: scale(0.95);
     background-color: rgba(45, 55, 72, 0.1);
@@ -2627,14 +2559,12 @@ body {
     transition: all 0.3s ease;
 }
 
-/* Улучшение отображения изображений в сообщениях на мобильных */
 @media (max-width: 768px) {
     .message-img {
         max-height: 250px;
     }
 }
 
-/* Исправление высоты контейнера чата при открытой клавиатуре */
 @media (max-height: 600px) and (max-width: 768px) {
     .chat-messages {
         padding-bottom: 220px !important;
@@ -2645,7 +2575,6 @@ body {
     }
 }
 
-/* Профиль на мобильных */
 @media (max-width: 768px) {
     .profile-container {
         margin: 20px auto;
@@ -2688,7 +2617,6 @@ body {
     }
 }
 
-/* Профиль на очень маленьких экранах */
 @media (max-width: 480px) {
     .profile-container {
         padding: 16px;
@@ -2705,7 +2633,6 @@ body {
     }
 }
 
-/* Градиенты и тени для глубины */
 .btn-primary, .chat-item.active, .notification {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
@@ -2718,12 +2645,10 @@ body {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
-/* Плавные переходы */
 * {
     transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
-/* Анимация пульсации для уведомлений */
 @keyframes pulse {
     0% {
         box-shadow: 0 0 0 0 rgba(45, 55, 72, 0.4);
@@ -2740,33 +2665,27 @@ body {
     animation: pulse 2s infinite;
 }
 
-/* Стили для складного интерфейса */
 .form-section, .chat-item, .message {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Улучшенные границы */
 input, textarea, .btn-icon, .sidebar, .chat-area, .profile-container {
     border: 1px solid var(--border-gray);
 }
 
-/* Акцентные элементы */
 .btn-primary, .nav-links button.active, .chat-item.active {
     background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
     color: var(--white);
 }
 
-/* Ховер эффекты */
 .btn-icon:hover, .chat-item:hover, .search-result-item:hover {
     background: var(--hover-gray);
 }
 
-/* Активные состояния */
 .btn-primary:active, .btn-icon:active {
     transform: scale(0.98);
 }
 
-/* Текст в серых тонах */
 p, .timestamp, .last-message, .status, .search-result-email {
     color: var(--medium-gray);
 }
@@ -2775,7 +2694,6 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
     color: var(--primary-dark);
 }
 
-/* Иконки */
 .fa-comments, .fa-user, .fa-comment, .fa-search, .fa-microphone, .fa-image, .fa-paper-plane {
     color: var(--primary-gray);
 }
@@ -2784,7 +2702,6 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
     color: #ffffff;
 }
 
-/* Мобильная адаптация окна превью изображений */
 @media (max-width: 768px) {
     .image-preview-container {
         position: fixed;
@@ -2911,7 +2828,6 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
         width: 100%;
     }
     
-    /* Оверлей для превью */
     .image-preview-overlay {
         position: fixed;
         top: 0;
@@ -2925,7 +2841,6 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
     }
 }
 
-/* Дополнительные улучшения для очень маленьких экранов */
 @media (max-width: 480px) {
     .image-preview-container {
         width: 95vw;
@@ -2958,7 +2873,6 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
     }
 }
 
-/* Для портретной ориентации на смартфонах */
 @media (max-height: 700px) and (max-width: 768px) {
     .image-preview-container {
         max-height: 70vh;
@@ -2974,7 +2888,6 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
     }
 }
 
-/* Для ландшафтной ориентации на мобильных */
 @media (max-height: 500px) and (orientation: landscape) {
     .image-preview-container {
         width: 70vw;
@@ -3002,5 +2915,232 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
     #send-image-btn, 
     #cancel-image-btn {
         width: calc(50% - 5px);
+    }
+}
+
+/* Добавьте в конец файла */
+
+/* Стили для уведомлений */
+.notifications-container {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    width: 350px;
+    max-width: 90vw;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.notification-item {
+    background: var(--white);
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border-left: 4px solid var(--primary-gray);
+    animation: slideInRight 0.3s ease;
+    cursor: pointer;
+    transition: all 0.3s;
+    border: 1px solid var(--border-gray);
+}
+
+.notification-item:hover {
+    transform: translateX(-5px);
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+}
+
+.notification-item.new-message {
+    border-left-color: var(--primary-gray);
+}
+
+.notification-item.message-read {
+    border-left-color: var(--online);
+}
+
+.notification-item.message-sent {
+    border-left-color: var(--success);
+}
+
+.notification-item.error {
+    border-left-color: var(--error);
+}
+
+.notification-item.success {
+    border-left-color: var(--success);
+}
+
+.notification-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.notification-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notification-time {
+    font-size: 12px;
+    color: var(--medium-gray);
+}
+
+.notification-content {
+    font-size: 14px;
+    color: var(--secondary-gray);
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+
+.notification-sender {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--lightest-gray);
+}
+
+.notification-sender-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.notification-sender-name {
+    font-size: 12px;
+    color: var(--medium-gray);
+}
+
+.notification-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.notification-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.3s;
+    flex: 1;
+}
+
+.notification-btn.open {
+    background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
+    color: white;
+}
+
+.notification-btn.dismiss {
+    background: var(--lighter-gray);
+    color: var(--primary-gray);
+}
+
+.notification-btn:hover {
+    transform: translateY(-1px);
+}
+
+.notification-btn.open:hover {
+    background: linear-gradient(135deg, var(--secondary-gray), var(--medium-gray));
+}
+
+.notification-btn.dismiss:hover {
+    background: var(--light-gray);
+    color: white;
+}
+
+/* Анимация для уведомлений */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.notification-item.removing {
+    animation: slideOutRight 0.3s ease forwards;
+}
+
+/* Индикатор новых уведомлений */
+.notifications-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: linear-gradient(135deg, var(--error), #f56565);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 6px;
+    border-radius: 10px;
+    min-width: 16px;
+    text-align: center;
+    animation: pulse 2s infinite;
+}
+
+/* Кнопка уведомлений в навбаре */
+.notifications-toggle {
+    position: relative;
+    background: none;
+    border: none;
+    color: var(--medium-gray);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.notifications-toggle:hover {
+    background: var(--hover-gray);
+    color: var(--primary-gray);
+}
+
+.notifications-toggle.active {
+    color: var(--primary-gray);
+    background: var(--hover-gray);
+}
+
+/* Мобильная версия уведомлений */
+@media (max-width: 768px) {
+    .notifications-container {
+        position: fixed;
+        top: 70px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+        max-width: none;
+    }
+    
+    .notification-item {
+        width: 100%;
+    }
+    
+    .notifications-toggle {
+        font-size: 18px;
+        padding: 10px;
     }
 }
