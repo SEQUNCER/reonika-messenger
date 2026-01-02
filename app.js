@@ -300,6 +300,12 @@ class REonikaMessenger {
             deleteChatBtn.addEventListener('click', () => this.deleteChat());
         }
 
+        // Кнопка "назад" на мобильных
+        const mobileBackBtn = document.getElementById('mobile-back-btn');
+        if (mobileBackBtn) {
+            mobileBackBtn.addEventListener('click', () => this.closeMobileChat());
+        }
+        
         const searchUserBtn = document.getElementById('search-user-btn');
         if (searchUserBtn) {
             searchUserBtn.addEventListener('click', () => this.searchUser());
@@ -1300,20 +1306,6 @@ class REonikaMessenger {
 
     showImagePreview() {
         if (!this.imagePreviewUrl || !this.currentImageFile) return;
-        
-        let previewOverlay = document.getElementById('image-preview-overlay');
-        if (!previewOverlay && this.isMobile) {
-            previewOverlay = document.createElement('div');
-            previewOverlay.id = 'image-preview-overlay';
-            previewOverlay.className = 'image-preview-overlay';
-            document.body.appendChild(previewOverlay);
-            
-            previewOverlay.addEventListener('click', (e) => {
-                if (e.target === previewOverlay) {
-                    this.removeImagePreview();
-                }
-            });
-        }
         let previewContainer = document.getElementById('image-preview-container');
         
         if (!previewContainer) {
@@ -1999,6 +1991,46 @@ class REonikaMessenger {
         this.hideRecordingIndicator();
     }
 
+    selectChat(chat) {
+        if (!chat || !this.currentUser) return;
+        
+        this.currentChat = chat;
+        this.updateChatUI();
+        
+        const chatHeader = document.getElementById('chat-header');
+        const chatInputContainer = document.getElementById('chat-input-container');
+        const noChatSelected = document.querySelector('.no-chat-selected');
+        
+        if (chatHeader) chatHeader.style.display = 'flex';
+        if (chatInputContainer) chatInputContainer.style.display = 'flex';
+        if (noChatSelected) noChatSelected.style.display = 'none';
+        
+        // Показать/скрыть кнопку "назад" на мобильных
+        const mobileBackBtn = document.getElementById('mobile-back-btn');
+        if (mobileBackBtn) {
+            if (this.isMobile) {
+                mobileBackBtn.style.display = 'flex';
+            } else {
+                mobileBackBtn.style.display = 'none';
+            }
+        }
+
+        if (this.isMobile) {
+            const chatArea = document.getElementById('chat-area');
+            const sidebar = document.querySelector('.sidebar');
+            
+            if (chatArea) {
+                chatArea.classList.add('chat-active');
+            }
+            if (sidebar) {
+                sidebar.style.display = 'none';
+            }
+        }
+        
+        this.loadMessages(chat.id);
+        this.scrollToLastMessage();
+    }
+
     showRecordingIndicator() {
         const indicator = document.createElement('div');
         indicator.className = 'voice-recording-indicator';
@@ -2059,12 +2091,12 @@ class REonikaMessenger {
             this.showNotification('Вы не участник этого чата', 'error');
             return;
         }
-
+        
         if (audioBlob.size === 0) {
             this.showNotification('Запись слишком короткая', 'error');
             return;
         }
-
+        
         const fileName = `${this.currentUser.id}/${Date.now()}.webm`;
 
         try {
@@ -2862,3 +2894,4 @@ class REonikaMessenger {
 document.addEventListener('DOMContentLoaded', () => {
     window.messenger = new REonikaMessenger();
 });
+      

@@ -1,4 +1,3 @@
-// Мобильные улучшения для REonikaMessenger
 class MobileREonikaEnhancements {
     constructor(messenger) {
         this.messenger = messenger;
@@ -12,7 +11,7 @@ class MobileREonikaEnhancements {
     }
     
     initMobileFeatures() {
-        this.addMobileBackButton();
+        this.setupBackButton();
         this.requestPermissions();
         this.enhanceResponsiveness();
         this.addSwipeGestures();
@@ -21,25 +20,15 @@ class MobileREonikaEnhancements {
         this.fixKeyboardIssues();
     }
     
-    addMobileBackButton() {
-        if (!document.getElementById('mobile-back-button')) {
-            const chatHeader = document.getElementById('chat-header');
-            if (chatHeader) {
-                const backButton = document.createElement('button');
-                backButton.id = 'mobile-back-button';
-                backButton.className = 'mobile-back-button';
-                backButton.innerHTML = '<i class="fas fa-arrow-left"></i>';
-                backButton.title = 'Назад к чатам';
-                
-                chatHeader.insertBefore(backButton, chatHeader.firstChild);
-                
-                backButton.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.closeMobileChat();
-                });
-            }
+    setupBackButton() {
+        // Используем существующую кнопку из HTML
+        const backBtn = document.getElementById('mobile-back-btn');
+        if (backBtn) {
+            backBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.closeMobileChat();
+            });
         }
-        
         this.addMobileBackButtonStyles();
     }
     
@@ -53,7 +42,7 @@ class MobileREonikaEnhancements {
             }
             
             if (sidebar) {
-                sidebar.style.display = 'block';
+                sidebar.style.display = 'flex';
             }
             
             this.messenger.currentChat = null;
@@ -85,7 +74,6 @@ class MobileREonikaEnhancements {
     
     fixMessageScrolling() {
         const originalRenderMessages = this.messenger.renderMessages;
-        const originalSelectChat = this.messenger.selectChat;
         
         this.messenger.renderMessages = function() {
             originalRenderMessages.call(this);
@@ -94,6 +82,8 @@ class MobileREonikaEnhancements {
                 this.scrollToLastMessage();
             }, 100);
         }.bind(this.messenger);
+        
+        const originalSelectChat = this.messenger.selectChat;
         
         this.messenger.selectChat = async function(chat) {
             try {
@@ -109,7 +99,6 @@ class MobileREonikaEnhancements {
                 
                 if (messageInput) {
                     messageInput.disabled = false;
-                    // НЕ фокусируем автоматически на мобильных
                     if (!this.isMobile) {
                         setTimeout(() => {
                             messageInput.focus();
@@ -223,58 +212,48 @@ class MobileREonikaEnhancements {
             const style = document.createElement('style');
             style.id = 'mobile-styles';
             style.textContent = `
-                /* ... существующие стили ... */
-                
                 @media (max-width: 768px) {
                     .chat-input-container {
-                        padding: 16px 24px !important;
-                        gap: 12px !important;
+                        padding: 10px 12px !important;
+                        gap: 8px !important;
                     }
                     
                     .chat-input-container .btn-icon {
-                        width: 48px !important;
-                        height: 48px !important;
-                        padding: 12px !important;
-                        margin: 0 4px !important;
-                        border-radius: 12px !important;
-                        border: 2px solid var(--border-gray) !important;
+                        width: 40px !important;
+                        height: 40px !important;
+                        padding: 8px !important;
+                        margin: 0 2px !important;
+                        border-radius: 50% !important;
+                        border: 1px solid var(--border-gray) !important;
                         background: var(--white) !important;
-                        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
                     }
                     
                     .chat-input-container .btn-primary {
-                        width: 48px !important;
-                        height: 48px !important;
-                        padding: 12px !important;
-                        margin-left: 4px !important;
-                        border-radius: 12px !important;
+                        width: 40px !important;
+                        height: 40px !important;
+                        padding: 8px !important;
+                        margin-left: 2px !important;
+                        border-radius: 50% !important;
                         background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray)) !important;
-                        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
                     }
                     
                     #message-input {
-                        padding: 14px 18px !important;
-                        border-radius: 12px !important;
+                        padding: 10px 14px !important;
+                        border-radius: 20px !important;
                         font-size: 16px !important;
-                        border: 2px solid var(--border-gray) !important;
+                        border: 1px solid var(--border-gray) !important;
                         background: var(--white) !important;
-                        margin: 0 4px !important;
-                    }
-                    
-                    .nav-links {
-                        gap: 16px !important;
-                        padding-right: 12px !important;
+                        margin: 0 2px !important;
                     }
                     
                     #logout-btn {
                         padding: 12px !important;
-                        min-width: 48px !important;
-                        min-height: 48px !important;
+                        min-width: 44px !important;
+                        min-height: 44px !important;
                         border-radius: 10px !important;
-                        background: linear-gradient(135deg, #e53e3e, #f56565) !important;
+                        background: linear-gradient(135deg, #e53e3e, #c53030) !important;
                         color: white !important;
                         border: none !important;
-                        margin-left: 4px !important;
                     }
                 }
             `;
@@ -399,7 +378,6 @@ class MobileREonikaEnhancements {
         this.optimizeTouchElements();
         this.preventZoomOnInput();
         this.adjustViewport();
-        this.fixInputScrolling();
     }
     
     optimizeTouchElements() {
@@ -410,7 +388,6 @@ class MobileREonikaEnhancements {
                     .touch-target {
                         min-height: 44px;
                         min-width: 44px;
-                        padding: 12px;
                     }
                     
                     .chat-item {
@@ -421,10 +398,6 @@ class MobileREonikaEnhancements {
                         -webkit-overflow-scrolling: touch;
                     }
                     
-                    .message:last-child {
-                        margin-bottom: 20px;
-                    }
-                    
                     .btn-icon {
                         touch-action: manipulation;
                     }
@@ -433,17 +406,14 @@ class MobileREonikaEnhancements {
                         font-size: 16px !important;
                     }
                     
-                    /* Улучшаем отзывчивость кнопок */
                     button, .btn-primary, .btn-icon {
                         touch-action: manipulation;
                     }
                     
-                    /* Предотвращаем выделение текста при быстром тапе */
                     * {
                         -webkit-tap-highlight-color: transparent;
                     }
                     
-                    /* Улучшаем скроллинг */
                     .chat-messages, .chats-list {
                         scroll-behavior: smooth;
                     }
@@ -458,39 +428,10 @@ class MobileREonikaEnhancements {
             const inputs = document.querySelectorAll('input, textarea, select');
             inputs.forEach(input => {
                 input.addEventListener('focus', () => {
-                    // Предотвращаем автоматическое увеличение масштаба
                     setTimeout(() => {
                         document.body.style.zoom = "1.0";
                     }, 100);
                 });
-            });
-        }
-    }
-    
-    fixInputScrolling() {
-        if (!this.messenger.isMobile) return;
-        
-        const messageInput = document.getElementById('message-input');
-        if (messageInput) {
-            messageInput.addEventListener('focus', () => {
-                setTimeout(() => {
-                    // Прокручиваем так, чтобы поле ввода было видно
-                    const inputRect = messageInput.getBoundingClientRect();
-                    const viewportHeight = window.innerHeight;
-                    
-                    if (inputRect.bottom > viewportHeight - 200) {
-                        window.scrollTo({
-                            top: window.scrollY + (inputRect.bottom - viewportHeight + 250),
-                            behavior: 'smooth'
-                        });
-                    }
-                    
-                    // Также прокручиваем контейнер сообщений
-                    const messagesContainer = document.getElementById('messages-container');
-                    if (messagesContainer) {
-                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    }
-                }, 300);
             });
         }
     }
@@ -508,43 +449,32 @@ class MobileREonikaEnhancements {
     fixKeyboardIssues() {
         if (!this.messenger.isMobile) return;
         
-        // Отслеживаем изменения высоты viewport (когда появляется/скрывается клавиатура)
         let lastHeight = window.innerHeight;
+        let resizeTimeout;
         
         window.addEventListener('resize', () => {
-            const newHeight = window.innerHeight;
-            
-            // Если высота уменьшилась (появилась клавиатура)
-            if (newHeight < lastHeight) {
-                setTimeout(() => {
-                    const messageInput = document.getElementById('message-input');
-                    if (messageInput && document.activeElement === messageInput) {
-                        // Прокручиваем к полю ввода
-                        messageInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        
-                        // Добавляем отступ снизу для контейнера сообщений
-                        const messagesContainer = document.getElementById('messages-container');
-                        if (messagesContainer) {
-                            messagesContainer.style.paddingBottom = '200px';
-                        }
-                    }
-                }, 100);
-            } 
-            // Если высота увеличилась (скрылась клавиатура)
-            else if (newHeight > lastHeight) {
-                // Убираем дополнительный отступ
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                const newHeight = window.innerHeight;
+                const messageInput = document.getElementById('message-input');
                 const messagesContainer = document.getElementById('messages-container');
-                if (messagesContainer) {
-                    messagesContainer.style.paddingBottom = '';
+                
+                if (newHeight < lastHeight && messageInput && document.activeElement === messageInput) {
+                    messageInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (messagesContainer) {
+                        messagesContainer.style.paddingBottom = '200px';
+                    }
+                } else if (newHeight > lastHeight) {
+                    if (messagesContainer) {
+                        messagesContainer.style.paddingBottom = '';
+                    }
+                    setTimeout(() => {
+                        this.messenger.scrollToLastMessage();
+                    }, 300);
                 }
                 
-                // Прокручиваем к последнему сообщению
-                setTimeout(() => {
-                    this.messenger.scrollToLastMessage();
-                }, 300);
-            }
-            
-            lastHeight = newHeight;
+                lastHeight = newHeight;
+            }, 100);
         });
     }
     
@@ -569,14 +499,13 @@ class MobileREonikaEnhancements {
             const endY = e.changedTouches[0].clientY;
             
             const diffX = startX - endX;
-            const diffY = startY - endY;
+            const diffY = Math.abs(startY - endY);
             
-            // Горизонтальный свайп
-            if (Math.abs(diffX) > threshold && Math.abs(diffY) < restraint) {
+            if (Math.abs(diffX) > threshold && diffY < restraint) {
                 if (diffX > 0) {
-                    this.handleSwipeLeft();
+                    // Свайп влево
                 } else {
-                    this.handleSwipeRight();
+                    this.closeMobileChat();
                 }
             }
             
@@ -586,16 +515,7 @@ class MobileREonikaEnhancements {
     }
     
     handleSwipeLeft() {
-        if (this.messenger.currentChat && this.messenger.isMobile) {
-            console.log('Свайп влево в чате');
-            // Можно добавить функциональность, например, показать меню действий
-        }
-    }
-    
-    handleSwipeRight() {
-        if (this.messenger.currentChat && this.messenger.isMobile) {
-            this.closeMobileChat();
-        }
+        // Можно добавить функциональность
     }
     
     async ensureMicrophonePermission() {
@@ -618,7 +538,7 @@ class MobileREonikaEnhancements {
             
             if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
                 this.messenger.showNotification(
-                    'Разрешите доступ к микрофону в настройках браузера для отправки голосовых сообщений',
+                    'Разрешите доступ к микрофону в настройках браузера',
                     'error'
                 );
             }
@@ -633,7 +553,6 @@ class MobileREonikaEnhancements {
             return;
         }
         
-        // Проверяем, не записываем ли уже
         if (this.messenger.isRecording) {
             return;
         }
@@ -646,14 +565,11 @@ class MobileREonikaEnhancements {
     }
 }
 
-
-
 document.addEventListener('DOMContentLoaded', () => {
     const checkMessenger = () => {
         if (window.messenger) {
             window.mobileEnhancements = new MobileREonikaEnhancements(window.messenger);
             
-            // Улучшенная отправка сообщений с корректной прокруткой
             const originalSendMessage = window.messenger.sendMessage;
             window.messenger.sendMessage = async function() {
                 await originalSendMessage.call(this);
@@ -665,68 +581,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 300);
             }.bind(window.messenger);
             
-            // Исправленные обработчики для голосовых сообщений (без дублирования)
-            const voiceRecordBtn = document.getElementById('voice-record-btn');
-            if (voiceRecordBtn) {
-                // Удаляем старые обработчики чтобы избежать дублирования
-                const newVoiceBtn = voiceRecordBtn.cloneNode(true);
-                voiceRecordBtn.parentNode.replaceChild(newVoiceBtn, voiceRecordBtn);
-                
-                // Добавляем новые обработчики
-                newVoiceBtn.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (window.mobileEnhancements) {
-                        window.mobileEnhancements.startVoiceRecordingWithPermission();
-                    } else {
-                        window.messenger.startVoiceRecording();
-                    }
-                });
-                
-                newVoiceBtn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (window.mobileEnhancements) {
-                        window.mobileEnhancements.startVoiceRecordingWithPermission();
-                    } else {
-                        window.messenger.startVoiceRecording();
-                    }
-                });
-                
-                // Остановка записи
-                document.addEventListener('mouseup', () => {
-                    if (this.messenger.isRecording) {
-                        this.messenger.stopVoiceRecording();
-                    }
-                });
-
-                document.addEventListener('touchend', (e) => {
-                    if (this.messenger.isRecording) {
-                        e.preventDefault();
-                        this.messenger.stopVoiceRecording();
-                    }
-                });
-            }
-            
-            // Обработчик для поля ввода на мобильных устройствах
-            const messageInput = document.getElementById('message-input');
-            if (messageInput && window.messenger.isMobile) {
-                messageInput.addEventListener('focus', () => {
-                    // Не прокручиваем автоматически, только когда пользователь сам коснется
-                    setTimeout(() => {
-                        if (window.messenger.scrollToLastMessage) {
-                            window.messenger.scrollToLastMessage();
-                        }
-                    }, 500);
-                });
-            }
-            
-            console.log('Мобильные улучшения загружены и интегрированы');
+            console.log('Мобильные улучшения загружены');
         } else {
             setTimeout(checkMessenger, 100);
         }
     };
     
-    // Запускаем проверку с задержкой
-    setTimeout(checkMessenger, 1000);
+    setTimeout(checkMessenger, 500);
 });
