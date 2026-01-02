@@ -432,6 +432,12 @@ class REonikaMessenger {
         window.addEventListener('blur', () => this.updateOnlineStatus(false));
         document.addEventListener('visibilitychange', () => {
             this.updateOnlineStatus(document.visibilityState === 'visible');
+            if (document.visibilityState === 'visible' && this.currentUser) {
+                this.loadChats();
+                if (this.currentChat) {
+                    this.loadMessages(this.currentChat.id);
+                }
+            }
         });
     }
 
@@ -514,43 +520,122 @@ class REonikaMessenger {
         });
         this.realtimeSubscriptions = [];
 
+        // Messages channel
         const messagesChannel = supabase
             .channel('messages')
-            .on('postgres_changes', 
-                { 
-                    event: 'INSERT', 
-                    schema: 'public', 
-                    table: 'messages' 
-                }, 
+            .on('postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages'
+                },
                 async (payload) => {
                     if (this.currentChat && payload.new.chat_id === this.currentChat.id) {
                         if (payload.new.sender_id === this.currentUser?.id) {
                             return;
                         }
-                        
+
                         const { data: sender } = await supabase
                             .from('profiles')
                             .select('*')
                             .eq('id', payload.new.sender_id)
                             .single();
-                        
+
                         const newMessage = {
                             ...payload.new,
                             sender: sender
                         };
-                        
+
                         this.messages.push(newMessage);
                         this.renderMessages();
                         this.scrollToLastMessage();
-                        
+
                         await this.markMessagesAsRead(this.currentChat.id);
                     }
-                    this.loadChats(); 
+                    this.loadChats();
                 }
             )
             .subscribe();
 
-   
+        // Chats channel
+        const chatsChannel = supabase
+            .channel('chats')
+            .on('postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'chats'
+                },
+                (payload) => {
+                    this.loadChats();
+                }
+            )
+            .subscribe();
+
+        // Profiles channel
+        const profilesChannel = supabase
+            .channel('profiles')
+            .on('postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles'
+                },
+                (payload) => {
+                    if (payload.new.id === this.currentUser.id) {
+                        this.currentUser.profile = payload.new;
+                        this.updateUserUI();
+                        this.updateProfileUI();
+                    } else {
+                        this.loadChats();
+                    }
+                }
+            )
+            .subscribe();
+
+        // Presence channel for online status
+        const presenceChannel = supabase.channel('online-users', {
+            config: {
+                presence: {
+                    key: this.currentUser.id
+                }
+            }
+        });
+
+        presenceChannel
+            .on('presence', { event: 'sync' }, () => {
+                const state = presenceChannel.presenceState();
+                this.onlineUsers.clear();
+                for (const [key, presences] of Object.entries(state)) {
+                    this.onlineUsers.add(key);
+                }
+                this.updateOnlineStatusUI();
+                this.renderChats();
+            })
+            .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+                this.onlineUsers.add(key);
+                this.updateOnlineStatusUI();
+                this.renderChats();
+            })
+            .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+                this.onlineUsers.delete(key);
+                this.updateOnlineStatusUI();
+                this.renderChats();
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await presenceChannel.track({
+                        user_id: this.currentUser.id,
+                        online_at: new Date().toISOString(),
+                        is_online: true
+                    });
+                }
+            });
+
+        this.realtimeSubscriptions.push(messagesChannel);
+        this.realtimeSubscriptions.push(chatsChannel);
+        this.realtimeSubscriptions.push(profilesChannel);
+        this.realtimeSubscriptions.push(presenceChannel);
     }
 
     async updateOnlineStatus(isOnline) {

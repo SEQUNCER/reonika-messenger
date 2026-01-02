@@ -28,13 +28,29 @@ class REonikaNotifications {
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
-                table: 'messages',
-                filter: `receiver_id=eq.${userId}`
-            }, (payload) => {
+                table: 'messages'
+            }, async (payload) => {
                 const message = payload.new;
+
+                // Проверяем, что сообщение в чате пользователя и не от самого пользователя
+                if (message.sender_id === userId) return;
+
+                const isUserChat = this.messenger.chats.some(chat => chat.id === message.chat_id);
+                if (!isUserChat) return;
+
                 if (this.notificationPermission === 'granted' &&
                     document.visibilityState === 'hidden') {
-                    this.showNotification(message);
+                    // Получаем данные отправителя
+                    const { data: sender } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', message.sender_id)
+                        .single();
+
+                    if (sender) {
+                        const notificationMessage = { ...message, sender };
+                        this.showNotification(notificationMessage);
+                    }
                 }
             })
             .subscribe();
