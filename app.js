@@ -2,41 +2,6 @@ import { supabase } from './supabase.js';
 import { MobileSessionManager } from './mobile-session-manager.js';
 
 class REonikaMessenger {
-    async startVoiceRecording() {
-        try {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                this.showNotification('Микрофон не поддерживается в этом браузере', 'error');
-                return;
-            }
-            
-            // Используем менеджер разрешений для проверки и запроса доступа к микрофону
-            let permissionState = 'prompt';
-            if (window.permissionManager) {
-                const result = await window.permissionManager.checkPermissionStatus('microphone');
-                permissionState = result;
-                
-                if (permissionState === 'denied') {
-                    this.showNotification('Разрешите доступ к микрофону в настройках браузера', 'error');
-                    return;
-                } else if (permissionState === 'prompt') {
-                    // Запрашиваем разрешение через менеджер
-                    await window.permissionManager.requestSpecificPermission('microphone');
-                }
-            } else {
-                // Fallback если менеджер разрешений не доступен
-                const permission = await navigator.permissions.query({ name: 'microphone' });
-                permissionState = permission.state;
-                if (permission.state === 'denied') {
-                    this.showNotification('Разрешите доступ к микрофону в настройках приложения', 'error');
-                    return;
-                }
-            }
-            
-        } catch (error) {
-            console.error('Microphone error:', error);
-            this.showNotification('Ошибка доступа к микрофону', 'error');
-        }
-    }
 
     constructor() {
         this.currentUser = null;
@@ -219,8 +184,13 @@ class REonikaMessenger {
             this.showMainScreen();
             
             this.setupRealtime();
-            
+
             await this.updateOnlineStatus(true);
+
+            // Request permissions at startup
+            setTimeout(() => {
+                this.requestStartupPermissions();
+            }, 1000);
             
             this.updateUserUI();
             this.updateProfileUI();
@@ -329,10 +299,7 @@ class REonikaMessenger {
             logoutBtnModal.addEventListener('click', () => this.logoutFromModal());
         }
 
-        const permissionsBtnModal = document.getElementById('permissions-btn-modal');
-        if (permissionsBtnModal) {
-            permissionsBtnModal.addEventListener('click', () => this.openPermissionsModal());
-        }
+
 
         const profileAvatarUploadModal = document.getElementById('profile-avatar-upload-modal');
         if (profileAvatarUploadModal) {
@@ -2132,10 +2099,9 @@ class REonikaMessenger {
                 return;
             }
             
-            const permission = await navigator.permissions.query({ name: 'microphone' });
-            if (permission.state === 'denied') {
-                this.showNotification('Разрешите доступ к микрофону в настройках приложения', 'error');
-                return;
+            const voiceBtn = document.getElementById('voice-record-btn');
+            if (voiceBtn) {
+                voiceBtn.classList.add('pressed');
             }
             
             if (this.voiceRecordingTimeout) {
@@ -2143,17 +2109,14 @@ class REonikaMessenger {
                 this.voiceRecordingTimeout = null;
             }
             
-            const voiceBtn = document.getElementById('voice-record-btn');
-            if (voiceBtn) {
-                voiceBtn.classList.add('pressed');
-            }
-            
             this.voiceRecordingTimeout = setTimeout(async () => {
                 try {
+                    // Запрашиваем доступ к микрофону с улучшенными параметрами
                     const stream = await navigator.mediaDevices.getUserMedia({ 
                         audio: {
                             echoCancellation: true,
                             noiseSuppression: true,
+                            autoGainControl: true,
                             sampleRate: 44100
                         }
                     });
@@ -2201,7 +2164,17 @@ class REonikaMessenger {
                     
                 } catch (error) {
                     console.error('Error getting microphone stream:', error);
-                    this.showNotification('Не удалось получить доступ к микрофону', 'error');
+                    
+                    // Определяем тип ошибки и показываем соответствующее сообщение
+                    if (error.name === 'NotAllowedError') {
+                        this.showNotification('Доступ к микрофону запрещен. Разрешите доступ в настройках браузера', 'error');
+                    } else if (error.name === 'NotFoundError') {
+                        this.showNotification('Микрофон не найден', 'error');
+                    } else if (error.name === 'NotReadableError') {
+                        this.showNotification('Микрофон занят другим приложением', 'error');
+                    } else {
+                        this.showNotification('Не удалось получить доступ к микрофону', 'error');
+                    }
                     
                     const voiceBtn = document.getElementById('voice-record-btn');
                     if (voiceBtn) {
@@ -2213,6 +2186,11 @@ class REonikaMessenger {
         } catch (error) {
             console.error('Microphone error:', error);
             this.showNotification('Ошибка доступа к микрофону', 'error');
+            
+            const voiceBtn = document.getElementById('voice-record-btn');
+            if (voiceBtn) {
+                voiceBtn.classList.remove('pressed');
+            }
         }
     }
 
@@ -2971,7 +2949,7 @@ class REonikaMessenger {
                 n.remove();
             }
         });
-        
+
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.innerHTML = `
@@ -2980,14 +2958,25 @@ class REonikaMessenger {
                 <span>${message}</span>
             </div>
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.remove();
             }
         }, 3000);
+    }
+
+    async requestStartupPermissions() {
+        if (window.permissionManager && window.permissionManager.requestEssentialPermissions) {
+            try {
+                const results = await window.permissionManager.requestEssentialPermissions();
+                console.log('Startup permissions requested:', results);
+            } catch (error) {
+                console.error('Error requesting startup permissions:', error);
+            }
+        }
     }
 
     // === Модальное окно профиля ===
@@ -3140,21 +3129,7 @@ class REonikaMessenger {
         await this.logout();
     }
 
-    openPermissionsModal() {
-        if (window.permissionManager) {
-            // Показываем модальное окно с текущими разрешениями
-            window.permissionManager.showPermissionModal([
-                { value: { permission: 'granted', name: 'notifications' } },
-                { value: { permission: 'granted', name: 'microphone' } },
-                { value: { permission: 'granted', name: 'camera' } },
-                { value: { permission: 'granted', name: 'clipboard' } },
-                { value: { permission: 'granted', name: 'geolocation' } },
-                { value: { permission: 'granted', name: 'persistentStorage' } }
-            ]);
-        } else {
-            this.showNotification('Менеджер разрешений не доступен', 'error');
-        }
-    }
+
 
 }
 
