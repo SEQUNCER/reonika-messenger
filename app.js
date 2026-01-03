@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { MobileSessionManager } from './mobile-session-manager.js';
 
 class REonikaMessenger {
     async startVoiceRecording() {
@@ -47,6 +48,12 @@ class REonikaMessenger {
         this.initEventListeners();
         this.initAuthStateListener(); 
         this.autoLogin(); 
+        
+        // Инициализируем менеджер мобильных сессий
+        if (window.mobileSessionManager) {
+            window.mobileSessionManager.startSessionMonitoring();
+            console.log('Mobile session manager started');
+        }
         
         window.addEventListener('resize', () => {
             this.isMobile = window.innerWidth <= 768;
@@ -120,6 +127,12 @@ class REonikaMessenger {
         try {
             console.log('Attempting auto login...');
 
+            // Проверяем, не был ли уже обработан auth-redirect.js
+            if (window.authRedirectManager) {
+                console.log('Auth redirect manager already handled authentication, skipping auto login');
+                return;
+            }
+
             this.showLoading(true);
 
             // Add timeout to prevent infinite loading
@@ -129,6 +142,7 @@ class REonikaMessenger {
 
             if (sessionError && sessionError.message !== 'Connection timeout') {
                 console.error('Session error:', sessionError);
+                this.clearStoredAuth();
                 this.showLoading(false);
                 this.showAuthScreen();
                 return;
@@ -143,6 +157,7 @@ class REonikaMessenger {
 
                 if (userError && userError.message !== 'Connection timeout') {
                     console.error('User error:', userError);
+                    this.clearStoredAuth();
                     this.showLoading(false);
                     this.showAuthScreen();
                     return;
@@ -157,15 +172,25 @@ class REonikaMessenger {
                 }
             }
 
-            console.log('No session found, showing auth screen');
+            console.log('Invalid session, showing auth screen');
+            this.clearStoredAuth();
             this.showLoading(false);
             this.showAuthScreen();
 
         } catch (error) {
             console.error('Auto login error:', error);
+            this.clearStoredAuth();
             this.showLoading(false);
             this.showAuthScreen();
         }
+    }
+
+    clearStoredAuth() {
+        // Очищаем сохраненные данные авторизации
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('supabase.auth.refreshToken');
+        sessionStorage.removeItem('supabase.auth.token');
+        sessionStorage.removeItem('supabase.auth.refreshToken');
     }
 
     async handleUserSignIn(user) {
@@ -224,7 +249,11 @@ class REonikaMessenger {
             this.voiceMessages.clear();
 
             this.showLoading(false);
-            this.showAuthScreen();
+            
+            // Перенаправляем на страницу авторизации
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 1000);
 
             console.log('User signed out successfully');
 
@@ -767,6 +796,19 @@ class REonikaMessenger {
             }
 
             this.showNotification('Вы вышли из системы', 'success');
+            
+            // Очищаем счетчики перенаправлений при выходе
+            sessionStorage.removeItem('auth_redirect_count');
+            sessionStorage.removeItem('auth_redirect_time');
+            sessionStorage.removeItem('login_redirect_count');
+            sessionStorage.removeItem('login_redirect_time');
+            sessionStorage.removeItem('auth_state_redirect_count');
+            sessionStorage.removeItem('auth_state_redirect_time');
+            
+            // Перенаправляем на страницу авторизации
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 1000);
 
         } catch (error) {
             console.error('Logout exception:', error);
@@ -3071,6 +3113,13 @@ class REonikaMessenger {
 
 }
 
+// Экспортируем класс для использования в auth-redirect.js
+export { REonikaMessenger };
+
+// Инициализация только если auth-redirect.js не используется
 document.addEventListener('DOMContentLoaded', () => {
-    window.messenger = new REonikaMessenger();
+    // Если auth-redirectManager уже существует, не инициализируем приложение здесь
+    if (!window.authRedirectManager) {
+        window.messenger = new REonikaMessenger();
+    }
 });

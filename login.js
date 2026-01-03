@@ -1,10 +1,17 @@
 import { supabase } from './supabase.js';
+import { MobileSessionManager } from './mobile-session-manager.js';
 
 class LoginManager {
     constructor() {
         this.initEventListeners();
         this.initAuthStateListener();
         this.checkAuth();
+        
+        // Инициализируем менеджер мобильных сессий
+        if (window.mobileSessionManager) {
+            window.mobileSessionManager.startSessionMonitoring();
+            console.log('Mobile session manager started on login page');
+        }
     }
 
     initEventListeners() {
@@ -38,7 +45,10 @@ class LoginManager {
             switch (event) {
                 case 'SIGNED_IN':
                     console.log('User signed in, redirecting to main app');
-                    window.location.href = 'index.html';
+                    // Небольшая задержка для сохранения сессии
+                    setTimeout(() => {
+                        this.redirectToMainApp();
+                    }, 500);
                     break;
 
                 case 'SIGNED_OUT':
@@ -48,29 +58,102 @@ class LoginManager {
                 case 'INITIAL_SESSION':
                     console.log('Initial session');
                     if (session?.user) {
-                        window.location.href = 'index.html';
+                        this.redirectToMainApp();
                     }
                     break;
             }
         });
     }
 
+    redirectToMainApp() {
+        // Проверяем на наличие циклических перенаправлений
+        const redirectCount = sessionStorage.getItem('auth_state_redirect_count') || '0';
+        const lastRedirectTime = sessionStorage.getItem('auth_state_redirect_time') || '0';
+        const now = Date.now();
+        
+        // Если было более 3 перенаправлений за последние 10 секунд, это цикл
+        if (parseInt(redirectCount) > 3 && (now - parseInt(lastRedirectTime)) < 10000) {
+            console.error('Detected auth state redirect loop, stopping redirects');
+            sessionStorage.removeItem('auth_state_redirect_count');
+            sessionStorage.removeItem('auth_state_redirect_time');
+            return;
+        }
+        
+        // Увеличиваем счетчик перенаправлений
+        sessionStorage.setItem('auth_state_redirect_count', (parseInt(redirectCount) + 1).toString());
+        sessionStorage.setItem('auth_state_redirect_time', now.toString());
+        
+        window.location.href = 'index.html';
+    }
+
     async checkAuth() {
         try {
-            const { data: { session }, error } = await supabase.auth.getSession();
+            // Проверяем валидность сессии напрямую
+            const sessionPromise = supabase.auth.getSession();
+            const timeoutPromise = new Promise((resolve) => 
+                setTimeout(() => resolve({ data: { session: null }, error: { message: 'Connection timeout' } }), 10000)
+            );
+            
+            const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
 
             if (error) {
                 console.error('Session error:', error);
+                this.clearStoredAuth();
                 return;
             }
 
             if (session) {
-                console.log('Found existing session, redirecting to main app');
+                // Дополнительно проверяем пользователя
+                const userPromise = supabase.auth.getUser();
+                const userTimeoutPromise = new Promise((resolve) => 
+                    setTimeout(() => resolve({ data: { user: null }, error: { message: 'Connection timeout' } }), 10000)
+                );
+                
+                const { data: { user }, error: userError } = await Promise.race([userPromise, userTimeoutPromise]);
+
+                if (userError || !user) {
+                    console.log('Invalid user session, clearing stored data');
+                    this.clearStoredAuth();
+                    return;
+                }
+
+                console.log('Found valid session, redirecting to main app');
+                
+                // Проверяем на наличие циклических перенаправлений
+                const redirectCount = sessionStorage.getItem('login_redirect_count') || '0';
+                const lastRedirectTime = sessionStorage.getItem('login_redirect_time') || '0';
+                const now = Date.now();
+                
+                // Если было более 3 перенаправлений за последние 10 секунд, это цикл
+                if (parseInt(redirectCount) > 3 && (now - parseInt(lastRedirectTime)) < 10000) {
+                    console.error('Detected redirect loop, stopping redirects');
+                    sessionStorage.removeItem('login_redirect_count');
+                    sessionStorage.removeItem('login_redirect_time');
+                    this.clearStoredAuth();
+                    return;
+                }
+                
+                // Увеличиваем счетчик перенаправлений
+                sessionStorage.setItem('login_redirect_count', (parseInt(redirectCount) + 1).toString());
+                sessionStorage.setItem('login_redirect_time', now.toString());
+                
                 window.location.href = 'index.html';
+            } else {
+                console.log('No valid session found, clearing stored data');
+                this.clearStoredAuth();
             }
         } catch (error) {
             console.error('Check auth error:', error);
+            this.clearStoredAuth();
         }
+    }
+
+    clearStoredAuth() {
+        // Очищаем сохраненные данные авторизации
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('supabase.auth.refreshToken');
+        sessionStorage.removeItem('supabase.auth.token');
+        sessionStorage.removeItem('supabase.auth.refreshToken');
     }
 
     showRegisterForm() {
