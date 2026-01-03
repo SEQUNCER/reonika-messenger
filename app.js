@@ -9,10 +9,27 @@ class REonikaMessenger {
                 return;
             }
             
-            const permission = await navigator.permissions.query({ name: 'microphone' });
-            if (permission.state === 'denied') {
-                this.showNotification('Разрешите доступ к микрофону в настройках приложения', 'error');
-                return;
+            // Используем менеджер разрешений для проверки и запроса доступа к микрофону
+            let permissionState = 'prompt';
+            if (window.permissionManager) {
+                const result = await window.permissionManager.checkPermissionStatus('microphone');
+                permissionState = result;
+                
+                if (permissionState === 'denied') {
+                    this.showNotification('Разрешите доступ к микрофону в настройках браузера', 'error');
+                    return;
+                } else if (permissionState === 'prompt') {
+                    // Запрашиваем разрешение через менеджер
+                    await window.permissionManager.requestSpecificPermission('microphone');
+                }
+            } else {
+                // Fallback если менеджер разрешений не доступен
+                const permission = await navigator.permissions.query({ name: 'microphone' });
+                permissionState = permission.state;
+                if (permission.state === 'denied') {
+                    this.showNotification('Разрешите доступ к микрофону в настройках приложения', 'error');
+                    return;
+                }
             }
             
         } catch (error) {
@@ -310,6 +327,11 @@ class REonikaMessenger {
         const logoutBtnModal = document.getElementById('logout-btn-modal');
         if (logoutBtnModal) {
             logoutBtnModal.addEventListener('click', () => this.logoutFromModal());
+        }
+
+        const permissionsBtnModal = document.getElementById('permissions-btn-modal');
+        if (permissionsBtnModal) {
+            permissionsBtnModal.addEventListener('click', () => this.openPermissionsModal());
         }
 
         const profileAvatarUploadModal = document.getElementById('profile-avatar-upload-modal');
@@ -3116,6 +3138,22 @@ class REonikaMessenger {
     async logoutFromModal() {
         this.closeProfileModal();
         await this.logout();
+    }
+
+    openPermissionsModal() {
+        if (window.permissionManager) {
+            // Показываем модальное окно с текущими разрешениями
+            window.permissionManager.showPermissionModal([
+                { value: { permission: 'granted', name: 'notifications' } },
+                { value: { permission: 'granted', name: 'microphone' } },
+                { value: { permission: 'granted', name: 'camera' } },
+                { value: { permission: 'granted', name: 'clipboard' } },
+                { value: { permission: 'granted', name: 'geolocation' } },
+                { value: { permission: 'granted', name: 'persistentStorage' } }
+            ]);
+        } else {
+            this.showNotification('Менеджер разрешений не доступен', 'error');
+        }
     }
 
 }

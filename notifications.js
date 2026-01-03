@@ -7,7 +7,14 @@ class REonikaNotifications {
     }
 
     async init() {
-        await this.requestPermission();
+        // Используем менеджер разрешений вместо прямого запроса
+        if (window.permissionManager) {
+            const result = await window.permissionManager.requestSpecificPermission('notifications');
+            this.notificationPermission = result.permission;
+        } else {
+            // Fallback если менеджер разрешений не загружен
+            await this.requestPermission();
+        }
         this.setupRealtime();
     }
 

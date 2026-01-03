@@ -225,6 +225,10 @@
                     <div class="form-section">
                         <h3><i class="fas fa-sign-out-alt"></i> Управление сессией</h3>
                         
+                        <button type="button" id="permissions-btn-modal" class="btn-secondary btn-full">
+                            <i class="fas fa-shield-alt"></i> Настройки разрешений
+                        </button>
+                        
                         <button type="button" id="logout-btn-modal" class="btn-secondary btn-full">
                             <i class="fas fa-sign-out-alt"></i> Выйти из аккаунта
                         </button>
@@ -248,6 +252,7 @@
     <script type="module" src="auth-redirect.js"></script>
     <script type="module" src="mobile-enhancements.js"></script>
     <script type="module" src="notifications.js"></script>
+    <script type="module" src="permission-manager.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
