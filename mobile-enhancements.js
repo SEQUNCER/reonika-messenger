@@ -246,15 +246,6 @@ class MobileREonikaEnhancements {
                         margin: 0 2px !important;
                     }
                     
-                    #logout-btn {
-                        padding: 12px !important;
-                        min-width: 44px !important;
-                        min-height: 44px !important;
-                        border-radius: 10px !important;
-                        background: linear-gradient(135deg, #e53e3e, #c53030) !important;
-                        color: white !important;
-                        border: none !important;
-                    }
                 }
             `;
             document.head.appendChild(style);

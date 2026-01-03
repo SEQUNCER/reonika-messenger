@@ -274,9 +274,6 @@ class REonikaMessenger {
     }
 
     initEventListeners() {
-        const logoutBtn = document.getElementById('logout-btn');
-        if (logoutBtn) logoutBtn.addEventListener('click', () => this.logout());
-
         // Открытие профиля по клику на аватарку
         const openProfileBtn = document.getElementById('open-profile-btn');
         if (openProfileBtn) {
@@ -308,6 +305,11 @@ class REonikaMessenger {
         const deleteAccountBtnModal = document.getElementById('delete-account-btn-modal');
         if (deleteAccountBtnModal) {
             deleteAccountBtnModal.addEventListener('click', () => this.showDeleteAccountConfirm());
+        }
+
+        const logoutBtnModal = document.getElementById('logout-btn-modal');
+        if (logoutBtnModal) {
+            logoutBtnModal.addEventListener('click', () => this.logoutFromModal());
         }
 
         const profileAvatarUploadModal = document.getElementById('profile-avatar-upload-modal');
@@ -2683,7 +2685,7 @@ class REonikaMessenger {
             const unreadCount = chat.unread_count || 0;
             
             const chatItem = document.createElement('div');
-            chatItem.className = `chat-item ${this.currentChat && this.currentChat.id === chat.id ? 'active' : ''}`;
+            chatItem.className = `chat-item`;
             chatItem.setAttribute('data-chat-id', chat.id);
             
             let partnerAvatarHTML = '';
@@ -3109,6 +3111,11 @@ class REonikaMessenger {
             console.error('Change password exception:', error);
             this.showNotification('Ошибка изменения пароля', 'error');
         }
+    }
+
+    async logoutFromModal() {
+        this.closeProfileModal();
+        await this.logout();
     }
 
 }

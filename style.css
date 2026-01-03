@@ -213,6 +213,19 @@ body {
     color: var(--white);
 }
 
+.btn-secondary:hover {
+    background-color: var(--light-gray);
+    color: var(--primary-gray);
+    border-color: var(--medium-gray);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
 #delete-account-btn {
     background: linear-gradient(135deg, #c53030, #e53e3e);
     color: white;
@@ -581,38 +594,16 @@ body {
     margin-top: auto;
 }
 
-.btn-logout {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 14px 20px;
-    background: linear-gradient(135deg, #e53e3e, #c53030);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-size: 15px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.btn-logout:hover {
-    background: linear-gradient(135deg, #c53030, #9b2c2c);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(229, 62, 62, 0.25);
-}
-
-.btn-logout:active {
-    transform: translateY(0);
-}
 
 .search-container {
     margin-bottom: 20px;
+    position: relative;
+}
+
+.search-input-row {
     display: flex;
     gap: 12px;
-    position: relative;
+    margin-bottom: 4px;
 }
 
 .search-container input {
@@ -641,6 +632,33 @@ body {
     padding: 14px 20px;
     border-radius: 10px;
     min-width: 50px;
+    background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
+    color: var(--white);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.search-container button:hover {
+    background: linear-gradient(135deg, var(--secondary-gray), var(--medium-gray));
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.search-container button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.search-container button:disabled {
+    background: var(--light-gray);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .search-results {
@@ -656,7 +674,7 @@ body {
     overflow-y: auto;
     z-index: 1000;
     display: none;
-    margin-top: 8px;
+    margin-top: 4px;
     animation: fadeIn 0.3s ease;
 }
 
@@ -832,15 +850,15 @@ body {
     position: absolute;
     top: 12px;
     right: 30px;
-    background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
-    color: var(--white);
+    background: var(--lighter-gray);
+    color: var(--medium-gray);
     font-size: 12px;
     font-weight: 600;
     padding: 4px 8px;
     border-radius: 12px;
     min-width: 20px;
     text-align: center;
-    animation: pulse 2s infinite;
+    animation: none;
 }
 
 .chat-area {
@@ -1636,32 +1654,8 @@ body {
         padding-right: 8px;
     }
     
-    #logout-btn {
-        padding: 10px !important;
-        min-width: 44px !important;
-        min-height: 44px !important;
-    }
 }
 
-@media (min-width: 769px) {
-    #logout-btn {
-        background: var(--white) !important;
-        border: 1px solid var(--border-gray) !important;
-        color: var(--secondary-gray) !important;
-    }
-    
-    #logout-btn:hover {
-        background: var(--hover-gray) !important;
-    }
-    
-    #logout-btn i {
-        color: var(--secondary-gray) !important;
-    }
-    
-    #logout-btn:hover i {
-        color: var(--primary-gray) !important;
-    }
-}
 
 .image-preview-container {
     position: absolute;
@@ -2417,7 +2411,7 @@ body {
 }
 
 .unread-badge {
-    animation: pulse 2s infinite;
+    animation: none;
 }
 
 .form-section, .chat-item, .message {
@@ -2429,8 +2423,8 @@ input, textarea, .btn-icon, .sidebar, .chat-area, .profile-container {
 }
 
 .btn-primary, .chat-item.active {
-    background: linear-gradient(135deg, var(--primary-gray), var(--secondary-gray));
-    color: var(--white);
+    background: var(--white);
+    color: var(--primary-dark);
 }
 
 .btn-icon:hover, .chat-item:hover, .search-result-item:hover {
@@ -3110,6 +3104,12 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
         flex-shrink: 0;
     }
     
+    .search-input-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+    
     .search-container input {
         padding: 12px 14px;
         font-size: 15px;
@@ -3118,6 +3118,18 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
     .search-container button {
         padding: 12px 14px;
         min-width: 44px;
+    }
+    
+    .search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin-top: 4px;
+        z-index: 1001;
+        max-height: 300px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+        border-radius: 12px;
     }
     
     .btn-logout {
