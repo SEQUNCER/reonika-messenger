@@ -36,4 +36,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
+// Экспортируем глобально для совместимости
+window.supabase = supabase;
+
 export { supabase };
