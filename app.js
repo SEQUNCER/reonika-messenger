@@ -71,27 +71,27 @@ class REonikaMessenger {
     initAuthStateListener() {
         supabase.auth.onAuthStateChange((event, session) => {
             console.log('Auth state changed:', event, session);
-            
+
             switch (event) {
                 case 'SIGNED_IN':
                     console.log('User signed in!');
-                    if (!this.isSessionRestored) {
+                    if (!this.isSessionRestored || !this.currentUser) {
                         this.handleUserSignIn(session.user);
                     }
                     break;
-                    
+
                 case 'TOKEN_REFRESHED':
                     console.log('Token refreshed');
                     if (this.currentUser && this.currentUser.id === session?.user?.id) {
                         this.updateOnlineStatus(true);
                     }
                     break;
-                    
+
                 case 'SIGNED_OUT':
                     console.log('User signed out!');
                     this.handleUserSignOut();
                     break;
-                    
+
                 case 'USER_UPDATED':
                     console.log('User updated');
                     if (session?.user) {
@@ -99,7 +99,7 @@ class REonikaMessenger {
                         this.updateUserUI();
                     }
                     break;
-                    
+
                 case 'INITIAL_SESSION':
                     console.log('Initial session restored');
                     this.isSessionRestored = true;
@@ -107,10 +107,10 @@ class REonikaMessenger {
                         this.handleUserSignIn(session.user);
                     }
                     break;
-                    
+
                 case 'USER_DELETED':
                     console.log('User deleted');
-                    this.handleUserSignOut();
+                    window.location.href = 'login.html';
                     break;
             }
         });
@@ -119,30 +119,35 @@ class REonikaMessenger {
     async autoLogin() {
         try {
             console.log('Attempting auto login...');
-            
+
             this.showLoading(true);
-            
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            
-            if (sessionError) {
+
+            // Add timeout to prevent infinite loading
+            const sessionPromise = supabase.auth.getSession();
+            const sessionTimeout = new Promise((resolve) => setTimeout(() => resolve({ data: { session: null }, error: { message: 'Connection timeout' } }), 10000));
+            const { data: { session }, error: sessionError } = await Promise.race([sessionPromise, sessionTimeout]);
+
+            if (sessionError && sessionError.message !== 'Connection timeout') {
                 console.error('Session error:', sessionError);
                 this.showLoading(false);
                 this.showAuthScreen();
                 return;
             }
-            
+
             if (session) {
                 console.log('Found existing session');
-                
-                const { data: { user }, error: userError } = await supabase.auth.getUser();
-                
-                if (userError) {
+
+                const userPromise = supabase.auth.getUser();
+                const userTimeout = new Promise((resolve) => setTimeout(() => resolve({ data: { user: null }, error: { message: 'Connection timeout' } }), 10000));
+                const { data: { user }, error: userError } = await Promise.race([userPromise, userTimeout]);
+
+                if (userError && userError.message !== 'Connection timeout') {
                     console.error('User error:', userError);
                     this.showLoading(false);
                     this.showAuthScreen();
                     return;
                 }
-                
+
                 if (user) {
                     console.log('User found, auto login successful');
                     this.isSessionRestored = true;
@@ -151,11 +156,11 @@ class REonikaMessenger {
                     return;
                 }
             }
-            
+
             console.log('No session found, showing auth screen');
             this.showLoading(false);
             this.showAuthScreen();
-            
+
         } catch (error) {
             console.error('Auto login error:', error);
             this.showLoading(false);
@@ -166,11 +171,10 @@ class REonikaMessenger {
     async handleUserSignIn(user) {
         try {
             this.currentUser = user;
-            
+
             await this.loadUserProfile();
-            
+
             this.showMainScreen();
-            this.showChatsScreen();
             
             this.setupRealtime();
             
@@ -178,9 +182,11 @@ class REonikaMessenger {
             
             this.updateUserUI();
             this.updateProfileUI();
-            
-            await this.loadChats();
-            
+
+            const loadChatsPromise = this.loadChats();
+            const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(), 10000));
+            await Promise.race([loadChatsPromise, timeoutPromise]);
+
             console.log('User signed in successfully:', user.email);
             
         } catch (error) {
@@ -196,25 +202,32 @@ class REonikaMessenger {
                 supabase.removeChannel(subscription);
             });
             this.realtimeSubscriptions = [];
-            
+
             if (this.updateInterval) {
                 clearInterval(this.updateInterval);
                 this.updateInterval = null;
             }
-            
+
+            // Сбросить активный класс у всех чатов
+            const chatItems = document.querySelectorAll('.chat-item');
+            chatItems.forEach(item => {
+                item.classList.remove('active');
+            });
+
             this.currentUser = null;
             this.currentChat = null;
             this.chats = [];
             this.messages = [];
             this.onlineUsers.clear();
             this.isSessionRestored = false;
-            
+
             this.voiceMessages.clear();
-            
+
+            this.showLoading(false);
             this.showAuthScreen();
-            
+
             console.log('User signed out successfully');
-            
+
         } catch (error) {
             console.error('Error handling user sign out:', error);
         }
@@ -232,28 +245,6 @@ class REonikaMessenger {
     }
 
     initEventListeners() {
-        const showRegisterBtn = document.getElementById('show-register');
-        if (showRegisterBtn) {
-            showRegisterBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.showRegisterForm();
-            });
-        }
-
-        const showLoginBtn = document.getElementById('show-login');
-        if (showLoginBtn) {
-            showLoginBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.showLoginForm();
-            });
-        }
-
-        const loginBtn = document.getElementById('login-btn');
-        if (loginBtn) loginBtn.addEventListener('click', () => this.login());
-        
-        const registerBtn = document.getElementById('register-btn');
-        if (registerBtn) registerBtn.addEventListener('click', () => this.register());
-        
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) logoutBtn.addEventListener('click', () => this.logout());
 
@@ -416,6 +407,65 @@ class REonikaMessenger {
         if (confirmModalConfirm) {
             confirmModalConfirm.addEventListener('click', () => this.handleConfirmAction());
         }
+
+        // Auth form handlers
+        const showRegisterBtn = document.getElementById('show-register');
+        if (showRegisterBtn) {
+            showRegisterBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showRegisterForm();
+            });
+        }
+
+        const showLoginBtn = document.getElementById('show-login');
+        if (showLoginBtn) {
+            showLoginBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showLoginForm();
+            });
+        }
+
+        const loginBtn = document.getElementById('login-btn');
+        if (loginBtn) loginBtn.addEventListener('click', () => this.login());
+
+        const registerBtn = document.getElementById('register-btn');
+        if (registerBtn) registerBtn.addEventListener('click', () => this.register());
+
+        // Enter key handlers for auth forms
+        const loginEmail = document.getElementById('login-email');
+        if (loginEmail) {
+            loginEmail.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.login();
+            });
+        }
+
+        const loginPassword = document.getElementById('login-password');
+        if (loginPassword) {
+            loginPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.login();
+            });
+        }
+
+        const registerUsername = document.getElementById('register-username');
+        if (registerUsername) {
+            registerUsername.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.register();
+            });
+        }
+
+        const registerEmail = document.getElementById('register-email');
+        if (registerEmail) {
+            registerEmail.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.register();
+            });
+        }
+
+        const registerPassword = document.getElementById('register-password');
+        if (registerPassword) {
+            registerPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.register();
+            });
+        }
         
         document.addEventListener('click', (e) => {
             const searchResults = document.getElementById('search-results');
@@ -447,15 +497,21 @@ class REonikaMessenger {
             if (chatArea) {
                 chatArea.classList.remove('chat-active');
             }
-            
+             
             const sidebar = document.querySelector('.sidebar');
             if (sidebar) {
                 sidebar.style.display = 'block';
             }
-            
+             
+            // Сбросить активный класс у всех чатов
+            const chatItems = document.querySelectorAll('.chat-item');
+            chatItems.forEach(item => {
+                item.classList.remove('active');
+            });
+             
             this.currentChat = null;
             this.updateChatUI();
-            
+             
             this.showChatsList();
         }
     }
@@ -463,7 +519,7 @@ class REonikaMessenger {
     showChatsList() {
         const sidebar = document.querySelector('.sidebar');
         const chatArea = document.getElementById('chat-area');
-        
+         
         if (this.isMobile) {
             if (sidebar) {
                 sidebar.style.display = 'block';
@@ -472,6 +528,12 @@ class REonikaMessenger {
                 chatArea.classList.remove('chat-active');
             }
         }
+        
+        // Сбросить активный класс у всех чатов
+        const chatItems = document.querySelectorAll('.chat-item');
+        chatItems.forEach(item => {
+            item.classList.remove('active');
+        });
     }
 
     debouncedSearch(searchText) {
@@ -622,13 +684,13 @@ class REonikaMessenger {
                 this.updateOnlineStatusUI();
                 this.renderChats();
             })
-            .subscribe(async (status) => {
+            .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
-                    await presenceChannel.track({
+                    presenceChannel.track({
                         user_id: this.currentUser.id,
                         online_at: new Date().toISOString(),
                         is_online: true
-                    });
+                    }).catch(error => console.error('Error tracking presence:', error));
                 }
             });
 
@@ -691,6 +753,28 @@ class REonikaMessenger {
         }
     }
 
+
+    async logout() {
+        try {
+            await this.updateOnlineStatus(false);
+
+            const { error } = await supabase.auth.signOut();
+
+            if (error) {
+                console.error('Logout error:', error);
+                this.showNotification('Ошибка выхода из системы', 'error');
+                return;
+            }
+
+            this.showNotification('Вы вышли из системы', 'success');
+
+        } catch (error) {
+            console.error('Logout exception:', error);
+            this.showNotification('Ошибка выхода из системы', 'error');
+        }
+    }
+
+    // Login methods
     showRegisterForm() {
         const loginForm = document.getElementById('login-form');
         const registerForm = document.getElementById('register-form');
@@ -708,7 +792,7 @@ class REonikaMessenger {
     async login() {
         const emailInput = document.getElementById('login-email');
         const passwordInput = document.getElementById('login-password');
-        
+
         const email = emailInput ? emailInput.value.trim() : '';
         const password = passwordInput ? passwordInput.value : '';
 
@@ -719,7 +803,7 @@ class REonikaMessenger {
 
         try {
             this.showLoading(true);
-            
+
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password
@@ -728,7 +812,7 @@ class REonikaMessenger {
             if (error) {
                 console.error('Login error:', error);
                 this.showLoading(false);
-                
+
                 if (error.message.includes('Invalid login credentials')) {
                     this.showNotification('Неверный email или пароль', 'error');
                 } else if (error.message.includes('Email not confirmed')) {
@@ -741,9 +825,11 @@ class REonikaMessenger {
 
             if (emailInput) emailInput.value = '';
             if (passwordInput) passwordInput.value = '';
-            
+
             this.showNotification('Вход выполнен успешно', 'success');
-            
+
+            // Auth state listener will handle the rest
+
         } catch (error) {
             console.error('Login exception:', error);
             this.showLoading(false);
@@ -755,7 +841,7 @@ class REonikaMessenger {
         const usernameInput = document.getElementById('register-username');
         const emailInput = document.getElementById('register-email');
         const passwordInput = document.getElementById('register-password');
-        
+
         const username = usernameInput ? usernameInput.value.trim() : '';
         const email = emailInput ? emailInput.value.trim() : '';
         const password = passwordInput ? passwordInput.value : '';
@@ -795,34 +881,14 @@ class REonikaMessenger {
 
             this.showNotification('Регистрация успешна! Теперь войдите в систему.', 'success');
             this.showLoginForm();
-            
+
             if (usernameInput) usernameInput.value = '';
             if (emailInput) emailInput.value = '';
             if (passwordInput) passwordInput.value = '';
-            
+
         } catch (error) {
             console.error('Register exception:', error);
             this.showNotification('Ошибка регистрации', 'error');
-        }
-    }
-
-    async logout() {
-        try {
-            await this.updateOnlineStatus(false);
-            
-            const { error } = await supabase.auth.signOut();
-            
-            if (error) {
-                console.error('Logout error:', error);
-                this.showNotification('Ошибка выхода из системы', 'error');
-                return;
-            }
-            
-            this.showNotification('Вы вышли из системы', 'success');
-            
-        } catch (error) {
-            console.error('Logout exception:', error);
-            this.showNotification('Ошибка выхода из системы', 'error');
         }
     }
 
@@ -878,17 +944,41 @@ class REonikaMessenger {
         }
     }
 
+    showAuthScreen() {
+        const authScreen = document.getElementById('auth-screen');
+        const mainScreen = document.getElementById('main-screen');
+
+        if (authScreen) authScreen.classList.remove('hidden');
+        if (mainScreen) mainScreen.classList.add('hidden');
+    }
+
+    showMainScreen() {
+        const authScreen = document.getElementById('auth-screen');
+        const mainScreen = document.getElementById('main-screen');
+
+        if (authScreen) authScreen.classList.add('hidden');
+        if (mainScreen) mainScreen.classList.remove('hidden');
+
+        this.showChatsScreen();
+    }
+
     showChatsScreen() {
         const chatsScreen = document.getElementById('chats-screen');
         const profileScreen = document.getElementById('profile-screen');
         const navChatsBtn = document.getElementById('nav-chats-btn');
         const navProfileBtn = document.getElementById('nav-profile-btn');
-        
+
         if (chatsScreen) chatsScreen.classList.remove('hidden');
         if (profileScreen) profileScreen.classList.add('hidden');
         if (navChatsBtn) navChatsBtn.classList.add('active');
         if (navProfileBtn) navProfileBtn.classList.remove('active');
-        
+
+        // Сбросить активный класс у всех чатов
+        const chatItems = document.querySelectorAll('.chat-item');
+        chatItems.forEach(item => {
+            item.classList.remove('active');
+        });
+
         if (this.isMobile) {
             this.showChatsList();
         }
@@ -899,12 +989,18 @@ class REonikaMessenger {
         const profileScreen = document.getElementById('profile-screen');
         const navChatsBtn = document.getElementById('nav-chats-btn');
         const navProfileBtn = document.getElementById('nav-profile-btn');
-        
+         
         if (chatsScreen) chatsScreen.classList.add('hidden');
         if (profileScreen) profileScreen.classList.remove('hidden');
         if (navChatsBtn) navChatsBtn.classList.remove('active');
         if (navProfileBtn) navProfileBtn.classList.add('active');
-        
+         
+        // Сбросить активный класс у всех чатов
+        const chatItems = document.querySelectorAll('.chat-item');
+        chatItems.forEach(item => {
+            item.classList.remove('active');
+        });
+         
         this.updateProfileUI();
     }
 
@@ -1738,7 +1834,7 @@ class REonikaMessenger {
 
     async deleteContact(chatId) {
         if (!this.currentUser) return;
-        
+         
         this.showConfirmModal(
             'Удалить контакт?',
             'Это действие удалит чат и все сообщения с этим пользователем. Это действие нельзя отменить.',
@@ -1752,23 +1848,29 @@ class REonikaMessenger {
                             deleted_at: new Date().toISOString()
                         })
                         .eq('id', chatId);
-
+ 
                     if (chatError) {
                         console.error('Error deleting chat:', chatError);
                         this.showNotification('Ошибка удаления контакта', 'error');
                         return;
                     }
-
+ 
                     if (this.currentChat && this.currentChat.id === chatId) {
+                        // Сбросить активный класс у всех чатов
+                        const chatItems = document.querySelectorAll('.chat-item');
+                        chatItems.forEach(item => {
+                            item.classList.remove('active');
+                        });
+                         
                         this.currentChat = null;
                         this.updateChatUI();
-                        
+                         
                         const chatHeader = document.getElementById('chat-header');
                         const chatInputContainer = document.getElementById('chat-input-container');
                         const noChatSelected = document.querySelector('.no-chat-selected');
                         const messagesContainer = document.getElementById('messages-container');
                         const chatArea = document.getElementById('chat-area');
-                        
+                         
                         if (chatHeader) chatHeader.style.display = 'none';
                         if (chatInputContainer) chatInputContainer.style.display = 'none';
                         if (noChatSelected) noChatSelected.style.display = 'flex';
@@ -1782,11 +1884,11 @@ class REonikaMessenger {
                             chatArea.classList.remove('chat-active');
                         }
                     }
-
+ 
                     this.showNotification('Контакт удален', 'success');
-                    
+                     
                     await this.loadChats();
-                    
+                     
                 } catch (error) {
                     console.error('Delete contact exception:', error);
                     this.showNotification('Ошибка удаления контакта', 'error');
@@ -1838,7 +1940,7 @@ class REonikaMessenger {
 
     async deleteChat() {
         if (!this.currentChat || !this.currentUser) return;
-        
+         
         this.showConfirmModal(
             'Удалить чат?',
             'Все сообщения в этом чате будут удалены. Это действие нельзя отменить.',
@@ -1852,25 +1954,31 @@ class REonikaMessenger {
                             deleted_at: new Date().toISOString()
                         })
                         .eq('id', this.currentChat.id);
-
+ 
                     if (error) {
                         console.error('Error deleting chat:', error);
                         this.showNotification('Ошибка удаления чата', 'error');
                         return;
                     }
-
+ 
                     this.showNotification('Чат удален', 'success');
-                    
+                     
+                    // Сбросить активный класс у всех чатов
+                    const chatItems = document.querySelectorAll('.chat-item');
+                    chatItems.forEach(item => {
+                        item.classList.remove('active');
+                    });
+                     
                     this.currentChat = null;
-                    
+                     
                     await this.loadChats();
-                    
+                     
                     const chatHeader = document.getElementById('chat-header');
                     const chatInputContainer = document.getElementById('chat-input-container');
                     const noChatSelected = document.querySelector('.no-chat-selected');
                     const messagesContainer = document.getElementById('messages-container');
                     const chatArea = document.getElementById('chat-area');
-                    
+                     
                     if (chatHeader) chatHeader.style.display = 'none';
                     if (chatInputContainer) chatInputContainer.style.display = 'none';
                     if (noChatSelected) noChatSelected.style.display = 'flex';
@@ -1884,7 +1992,7 @@ class REonikaMessenger {
                         chatArea.classList.remove('chat-active');
                         this.showChatsList();
                     }
-                    
+                     
                 } catch (error) {
                     console.error('Delete chat exception:', error);
                     this.showNotification('Ошибка удаления чата', 'error');
@@ -2078,18 +2186,18 @@ class REonikaMessenger {
 
     selectChat(chat) {
         if (!chat || !this.currentUser) return;
-        
+
         this.currentChat = chat;
         this.updateChatUI();
-        
+
         const chatHeader = document.getElementById('chat-header');
         const chatInputContainer = document.getElementById('chat-input-container');
         const noChatSelected = document.querySelector('.no-chat-selected');
-        
+
         if (chatHeader) chatHeader.style.display = 'flex';
         if (chatInputContainer) chatInputContainer.style.display = 'flex';
         if (noChatSelected) noChatSelected.style.display = 'none';
-        
+
         // Показать/скрыть кнопку "назад" на мобильных
         const mobileBackBtn = document.getElementById('mobile-back-btn');
         if (mobileBackBtn) {
@@ -2103,15 +2211,17 @@ class REonikaMessenger {
         if (this.isMobile) {
             const chatArea = document.getElementById('chat-area');
             const sidebar = document.querySelector('.sidebar');
-            
+
             if (chatArea) {
                 chatArea.classList.add('chat-active');
+                // Убедимся что чат виден на мобильных
+                chatArea.style.display = 'flex';
             }
             if (sidebar) {
                 sidebar.style.display = 'none';
             }
         }
-        
+
         this.loadMessages(chat.id);
         this.scrollToLastMessage();
     }
@@ -2456,25 +2566,31 @@ class REonikaMessenger {
 
     updateChatUI() {
         if (!this.currentChat || !this.currentUser) {
+            // Сбросить активный класс у всех чатов
+            const chatItems = document.querySelectorAll('.chat-item');
+            chatItems.forEach(item => {
+                item.classList.remove('active');
+            });
+             
             const chatHeader = document.getElementById('chat-header');
             const chatInputContainer = document.getElementById('chat-input-container');
             const noChatSelected = document.querySelector('.no-chat-selected');
-            
+             
             if (chatHeader) chatHeader.style.display = 'none';
             if (chatInputContainer) chatInputContainer.style.display = 'none';
             if (noChatSelected) noChatSelected.style.display = 'flex';
             return;
         }
-
-        const partner = this.currentChat.user1_id === this.currentUser.id 
-            ? this.currentChat.user2 
+ 
+        const partner = this.currentChat.user1_id === this.currentUser.id
+            ? this.currentChat.user2
             : this.currentChat.user1;
-
+ 
         if (!partner) return;
-
+ 
         const chatPartnerName = document.getElementById('chat-partner-name');
         if (chatPartnerName) chatPartnerName.textContent = partner.username;
-        
+         
         const partnerAvatar = document.getElementById('chat-partner-avatar');
         if (partnerAvatar) {
             partnerAvatar.innerHTML = '';
@@ -2494,7 +2610,7 @@ class REonikaMessenger {
                 partnerAvatar.style.fontWeight = 'bold';
             }
         }
-        
+         
         this.updateOnlineStatusUI();
     }
 
@@ -2526,6 +2642,7 @@ class REonikaMessenger {
             
             const chatItem = document.createElement('div');
             chatItem.className = `chat-item ${this.currentChat && this.currentChat.id === chat.id ? 'active' : ''}`;
+            chatItem.setAttribute('data-chat-id', chat.id);
             
             let partnerAvatarHTML = '';
             if (partner.avatar_url) {
@@ -2558,7 +2675,7 @@ class REonikaMessenger {
                     this.selectChat(chat);
                 }
             });
-            
+             
             const deleteBtn = chatItem.querySelector('.delete-contact-btn');
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', (e) => {
@@ -2568,6 +2685,9 @@ class REonikaMessenger {
                 });
             }
             
+            // Добавляем data-chat-id к элементу чата для дальнейшего использования
+            chatItem.setAttribute('data-chat-id', chat.id);
+             
             container.appendChild(chatItem);
         });
     }
@@ -2949,34 +3069,8 @@ class REonikaMessenger {
         }
     }
 
-    showAuthScreen() {
-        const authScreen = document.getElementById('auth-screen');
-        const mainScreen = document.getElementById('main-screen');
-        if (authScreen) {
-            authScreen.style.display = 'block';
-            authScreen.classList.remove('hidden');
-        }
-        if (mainScreen) {
-            mainScreen.style.display = 'none';
-            mainScreen.classList.add('hidden');
-        }
-    }
-
-    showMainScreen() {
-        const authScreen = document.getElementById('auth-screen');
-        const mainScreen = document.getElementById('main-screen');
-        if (authScreen) {
-            authScreen.style.display = 'none';
-            authScreen.classList.add('hidden');
-        }
-        if (mainScreen) {
-            mainScreen.style.display = 'block';
-            mainScreen.classList.remove('hidden');
-        }
-    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     window.messenger = new REonikaMessenger();
 });
-      

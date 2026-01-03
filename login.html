@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>REonika - Авторизация</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
+</head>
+<body>
+    <div id="auth-screen">
+        <div class="container">
+            <div class="form-container">
+                <div class="form-title">
+                    <i class="fas fa-comments" style="font-size: 48px; margin-bottom: 20px;"></i>
+                    <h1>REonika</h1>
+                    <p>Современный мессенджер для общения</p>
+                </div>
+
+                <form id="login-form">
+                    <div class="input-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" required placeholder="Ваш email">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="login-password">Пароль</label>
+                        <input type="password" id="login-password" required placeholder="Ваш пароль">
+                    </div>
+
+                    <button type="button" id="login-btn" class="btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> Войти
+                    </button>
+
+                    <div class="form-footer">
+                        <p>Нет аккаунта? <a href="#" id="show-register">Зарегистрироваться</a></p>
+                    </div>
+                </form>
+
+                <form id="register-form" class="hidden">
+                    <div class="input-group">
+                        <label for="register-username">Имя пользователя</label>
+                        <input type="text" id="register-username" required placeholder="Придумайте имя" minlength="3">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" required placeholder="Ваш email">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="register-password">Пароль</label>
+                        <input type="password" id="register-password" required placeholder="Не менее 6 символов" minlength="6">
+                    </div>
+
+                    <button type="button" id="register-btn" class="btn-primary">
+                        <i class="fas fa-user-plus"></i> Зарегистрироваться
+                    </button>
+
+                    <div class="form-footer">
+                        <p>Уже есть аккаунт? <a href="#" id="show-login">Войти</a></p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">Загрузка...</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="supabase.js"></script>
+    <script type="module" src="login.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!window.indexedDB) {
+                alert('Ваш браузер не поддерживает IndexedDB. Некоторые функции могут работать некорректно.');
+            }
+
+            if (!window.Notification || !('serviceWorker' in navigator)) {
+                console.warn('Уведомления и офлайн-режим недоступны в этом браузере');
+            }
+
+            if (!window.MediaRecorder) {
+                console.warn('Голосовые сообщения недоступны в этом браузере');
+            }
+
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+            if (isMobile) {
+                document.body.classList.add('mobile-device');
+            }
+
+            if (isMobile) {
+                let lastTouchEnd = 0;
+                document.addEventListener('touchend', function(event) {
+                    const now = (new Date()).getTime();
+                    if (now - lastTouchEnd <= 300) {
+                        event.preventDefault();
+                    }
+                    lastTouchEnd = now;
+                }, false);
+            }
+
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(button => {
+                button.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    return false;
+                });
+            });
+
+            const inputs = document.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                input.addEventListener('focus', function() {
+                    if (isMobile) {
+                        this.style.fontSize = '16px';
+                    }
+                });
+
+                input.addEventListener('blur', function() {
+                    if (isMobile) {
+                        this.style.fontSize = '';
+                    }
+                });
+            });
+
+            console.log('Страница авторизации инициализирована. Мобильная поддержка:', isMobile);
+        });
+
+        function setMobileHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+
+            const chatsList = document.querySelector('.chats-list');
+            const sidebar = document.querySelector('.sidebar');
+            if (chatsList && sidebar) {
+                const sidebarHeight = sidebar.offsetHeight;
+                const searchHeight = document.querySelector('.search-container')?.offsetHeight || 0;
+                const profileHeight = document.querySelector('.user-profile')?.offsetHeight || 0;
+                const footerHeight = document.querySelector('.sidebar-footer')?.offsetHeight || 0;
+                const availableHeight = sidebarHeight - searchHeight - profileHeight - footerHeight;
+                chatsList.style.height = availableHeight + 'px';
+            }
+        }
+
+        window.addEventListener('load', setMobileHeight);
+        window.addEventListener('resize', setMobileHeight);
+        window.addEventListener('orientationchange', setMobileHeight);
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                setTimeout(setMobileHeight, 100);
+            }
+        });
+    </script>
+
+</body>
+</html>

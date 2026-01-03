@@ -3,6 +3,17 @@
     padding: 0;
     box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    /* Скрываем кнопку возврата на десктопе */
+    #mobile-back-btn {
+        display: none !important;
+    }
+
+    /* Показываем на мобильных */
+    @media (max-width: 768px) {
+        #mobile-back-btn {
+            display: flex !important;
+        }
+    }
 }
 
 :root {
@@ -457,7 +468,7 @@ body {
         font-size: 15px;
     }
 }
-
+    
 @media (max-width: 480px) {
     .form-container {
         padding: 28px 20px;
@@ -475,7 +486,7 @@ body {
         font-size: 13px;
     }
 }
-
+    
 #main-screen {
     display: none;
     min-height: 100vh;
@@ -753,16 +764,11 @@ body {
     background: var(--white);
 }
 
-.chat-item:hover {
-    background-color: var(--hover-gray);
-    border-color: var(--border-gray);
-    transform: translateX(4px);
+.chat-item:focus {
+    outline: none;
 }
 
-.chat-item.active {
-    background: linear-gradient(135deg, var(--hover-gray), var(--active-gray));
-    border-color: var(--primary-gray);
-}
+
 
 .chat-avatar-container {
     position: relative;
@@ -1427,11 +1433,12 @@ body {
     }
 }
 
-/* Mobile back button - show on all mobile screens */
-#mobile-back-btn.mobile-back-button {
-    display: flex !important;
+/* Скрываем кнопку назад на десктопе */
+#mobile-back-btn {
+    display: none !important;
 }
 
+/* Показываем на мобильных устройствах */
 @media (max-width: 768px) {
     /* Кнопка назад в чате */
     #mobile-back-btn {
@@ -1541,11 +1548,11 @@ body {
     
     /* Chat area */
     .chat-area {
-        display: none;
+        display: none !important;
     }
     
     .chat-area.chat-active {
-        display: flex;
+        display: flex !important;
     }
 }
     
@@ -2930,6 +2937,7 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
         overflow: hidden;
         width: 100%;
         height: 100%;
+        display: block !important;
     }
     
     /* Показываем кнопку назад только на мобильных */
@@ -2969,6 +2977,8 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
         border-right: none;
         box-shadow: none;
         flex-shrink: 0;
+        position: relative;
+        z-index: 1;
     }
     
     .chats-list {
@@ -2991,10 +3001,13 @@ h1, h2, h3, h4, h5, h6, .search-result-name, .chat-header-info h4 {
         background: var(--white);
         width: 100%;
         height: 100%;
+        display: flex !important;
+        flex-direction: column;
     }
     
     .chat-area.chat-active {
         transform: translateX(0);
+        display: flex !important;
     }
     
     .chat-header {
