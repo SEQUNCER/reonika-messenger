@@ -53,7 +53,11 @@
             transition: all 0.3s ease;
         }
         
-        .permission-card:hover {
+        .permission-card.clickable {
+            cursor: pointer;
+        }
+        
+        .permission-card.clickable:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
             border-color: #cbd5e0;
@@ -100,6 +104,19 @@
             color: #718096;
             font-size: 14px;
             line-height: 1.5;
+        }
+        
+        .permission-hint {
+            font-size: 11px;
+            color: #a0aec0;
+            margin-top: 8px;
+            font-style: italic;
+            opacity: 0.8;
+        }
+        
+        .permission-card:hover .permission-hint {
+            opacity: 1;
+            color: #718096;
         }
         
         .test-buttons {
@@ -165,12 +182,12 @@
 <body>
     <div class="test-container">
         <div class="test-header">
-            <h1>🔐 Тест разрешений REonika</h1>
+            <h1>[!] Тест разрешений REonika</h1>
             <p>Эта страница позволяет протестировать систему запроса разрешений приложения</p>
         </div>
 
         <div class="info-box">
-            <h4>ℹ️ Информация</h4>
+            <h4>[i] Информация</h4>
             <p>При первом посещении приложения REonika автоматически запрашивает все необходимые разрешения для полноценной работы. Эта страница позволяет проверить текущий статус разрешений и протестировать их запрос.</p>
         </div>
 
@@ -194,7 +211,7 @@
         </div>
 
         <div class="info-box">
-            <h4>📋 Что тестируется</h4>
+            <h4>[i] Что тестируется</h4>
             <p>
                 <strong>Уведомления:</strong> Для получения сообщений когда приложение свернуто<br>
                 <strong>Микрофон:</strong> Для записи и отправки голосовых сообщений<br>
@@ -214,37 +231,37 @@
         const permissions = [
             {
                 name: 'notifications',
-                title: '📢 Уведомления',
+                title: '[+] Уведомления',
                 description: 'Для получения сообщений когда приложение свернуто',
                 icon: 'fa-bell'
             },
             {
                 name: 'microphone',
-                title: '🎤 Микрофон',
+                title: '[+] Микрофон',
                 description: 'Для записи и отправки голосовых сообщений',
                 icon: 'fa-microphone'
             },
             {
                 name: 'camera',
-                title: '📷 Камера',
+                title: '[+] Камера',
                 description: 'Для отправки фотографий и видеосообщений',
                 icon: 'fa-camera'
             },
             {
                 name: 'clipboard',
-                title: '📋 Буфер обмена',
+                title: '[+] Буфер обмена',
                 description: 'Для быстрой вставки текста и изображений',
                 icon: 'fa-clipboard'
             },
             {
                 name: 'geolocation',
-                title: '📍 Геолокация',
+                title: '[+] Геолокация',
                 description: 'Для определения местоположения (опционально)',
                 icon: 'fa-map-marker-alt'
             },
             {
                 name: 'persistentStorage',
-                title: '💾 Постоянное хранилище',
+                title: '[+] Постоянное хранилище',
                 description: 'Для офлайн-работы приложения',
                 icon: 'fa-database'
             }
@@ -371,8 +388,9 @@
             
             permissions.forEach(permission => {
                 const card = document.createElement('div');
-                card.className = 'permission-card';
+                card.className = 'permission-card clickable';
                 card.setAttribute('data-permission', permission.name);
+                card.style.cursor = 'pointer';
                 
                 card.innerHTML = `
                     <h3>
@@ -381,10 +399,62 @@
                     </h3>
                     <div class="permission-status">Проверка...</div>
                     <div class="permission-description">${permission.description}</div>
+                    <div class="permission-hint">Нажмите для повторного запроса</div>
                 `;
+                
+                // Добавляем обработчик для повторного запроса
+                card.addEventListener('click', async () => {
+                    await requestSpecificPermission(permission.name);
+                });
                 
                 grid.appendChild(card);
             });
+        }
+
+        // Запросить конкретное разрешение
+        async function requestSpecificPermission(permissionName) {
+            console.log(`Requesting specific permission: ${permissionName}`);
+            
+            if (window.permissionManager) {
+                try {
+                    const result = await window.permissionManager.requestSpecificPermission(permissionName);
+                    console.log(`Permission request result for ${permissionName}:`, result);
+                    
+                    // Показываем уведомление
+                    showNotification(`Разрешение "${permissionName}"`, result.permission === 'granted' ? 'предоставлено' : 'запрещено');
+                    
+                    // Обновляем статус
+                    setTimeout(() => checkPermission({ name: permissionName }), 1000);
+                    
+                } catch (error) {
+                    console.error(`Error requesting ${permissionName}:`, error);
+                    showNotification(`Ошибка при запросе "${permissionName}"`, 'error');
+                }
+            } else {
+                // Fallback для тестовой страницы
+                await checkPermission({ name: permissionName });
+            }
+        }
+
+        // Показать уведомление
+        function showNotification(title, status) {
+            const notification = document.createElement('div');
+            notification.className = `permission-update-notification ${status}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas ${status === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle'}"></i>
+                    <span>${title}: ${status}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Удаляем уведомление через 3 секунды
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 3000);
         }
 
         // Инициализация

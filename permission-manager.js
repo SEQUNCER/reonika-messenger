@@ -22,6 +22,46 @@ class PermissionManager {
             await this.requestAllPermissions();
             localStorage.setItem('permissions_requested', 'true');
         }
+        
+        // Добавляем обработчик для обнаружения возврата из настроек
+        this.setupVisibilityChangeListener();
+    }
+
+    // Настройка обработчика изменения видимости страницы
+    setupVisibilityChangeListener() {
+        // Отслеживаем когда страница становится видимой снова (возврат из настроек)
+        document.addEventListener('visibilitychange', async () => {
+            if (!document.hidden) {
+                console.log('Page became visible, checking permissions...');
+                await this.refreshPermissionModal();
+            }
+        });
+
+        // Отслеживаем фокус окна
+        window.addEventListener('focus', async () => {
+            console.log('Window gained focus, checking permissions...');
+            await this.refreshPermissionModal();
+        });
+
+        // Отслеживаем изменение размера окна (может указывать на возврат из настроек)
+        let lastWidth = window.innerWidth;
+        let lastHeight = window.innerHeight;
+        
+        window.addEventListener('resize', async () => {
+            const currentWidth = window.innerWidth;
+            const currentHeight = window.innerHeight;
+            
+            // Если размер изменился значительно, возможно пользователь вернулся из настроек
+            if (Math.abs(currentWidth - lastWidth) > 100 || Math.abs(currentHeight - lastHeight) > 100) {
+                console.log('Significant resize detected, checking permissions...');
+                setTimeout(async () => {
+                    await this.refreshPermissionModal();
+                }, 500);
+            }
+            
+            lastWidth = currentWidth;
+            lastHeight = currentHeight;
+        });
     }
 
     async requestAllPermissions() {
@@ -72,24 +112,64 @@ class PermissionManager {
         }
 
         try {
-            // Сначала проверяем текущее состояние
-            const permission = await navigator.permissions.query({ name: 'microphone' });
-            this.permissions.microphone = permission.state;
+            // Для мобильных устройств используем более надежный способ запроса
+            let permissionState = 'prompt';
             
-            if (permission.state === 'prompt') {
-                // Запрашиваем доступ только если нужно
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: true,
-                    video: false 
-                });
-                // Сразу закрываем поток после получения разрешения
-                stream.getTracks().forEach(track => track.stop());
-                console.log('Microphone permission granted');
+            if (navigator.permissions) {
+                try {
+                    const permission = await navigator.permissions.query({ name: 'microphone' });
+                    permissionState = permission.state;
+                    this.permissions.microphone = permission.state;
+                } catch (permError) {
+                    console.warn('Could not query microphone permission:', permError);
+                }
             }
             
-            return { permission: permission.state, name: 'microphone' };
+            if (permissionState === 'prompt' || permissionState === 'default') {
+                // Запрашиваем доступ с улучшенными параметрами для мобильных
+                const constraints = {
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    },
+                    video: false
+                };
+                
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                // Сразу закрываем поток после получения разрешения
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Обновляем статус
+                if (navigator.permissions) {
+                    try {
+                        const updatedPermission = await navigator.permissions.query({ name: 'microphone' });
+                        this.permissions.microphone = updatedPermission.state;
+                        console.log('Microphone permission granted:', updatedPermission.state);
+                        return { permission: updatedPermission.state, name: 'microphone' };
+                    } catch (updateError) {
+                        console.warn('Could not update microphone permission status:', updateError);
+                    }
+                }
+                
+                console.log('Microphone permission granted');
+                return { permission: 'granted', name: 'microphone' };
+            }
+            
+            return { permission: permissionState, name: 'microphone' };
         } catch (error) {
             console.error('Error requesting microphone permission:', error);
+            
+            // Дополнительная информация об ошибке для мобильных
+            if (error.name === 'NotAllowedError') {
+                console.warn('Microphone access denied by user');
+            } else if (error.name === 'NotFoundError') {
+                console.warn('No microphone device found');
+            } else if (error.name === 'NotReadableError') {
+                console.warn('Microphone is already in use by another application');
+            }
+            
             return { permission: 'denied', name: 'microphone', error };
         }
     }
@@ -195,19 +275,19 @@ class PermissionManager {
         let message = `Настройки разрешений REonika:\n\n`;
         
         if (granted > 0) {
-            message += `✅ Разрешено: ${granted}\n`;
+            message += `[+] Разрешено: ${granted}\n`;
         }
         
         if (denied > 0) {
-            message += `❌ Запрещено: ${denied}\n`;
+            message += `[-] Запрещено: ${denied}\n`;
         }
         
         if (unsupported > 0) {
-            message += `⚠️ Не поддерживается: ${unsupported}\n`;
+            message += `[!] Не поддерживается: ${unsupported}\n`;
         }
         
         if (errors > 0) {
-            message += `⚠️ Ошибки: ${errors}\n`;
+            message += `[!] Ошибки: ${errors}\n`;
         }
 
         message += `\nВы можете изменить разрешения в настройках браузера в любой момент.`;
@@ -260,7 +340,6 @@ class PermissionManager {
                         </div>
                         <div class="permission-actions">
                             <button class="btn-primary permission-continue">Продолжить</button>
-                            <button class="btn-secondary permission-settings">Настройки браузера</button>
                         </div>
                     </div>
                 </div>
@@ -271,12 +350,10 @@ class PermissionManager {
             // Добавляем обработчики событий
             const closeBtn = modal.querySelector('.permission-modal-close');
             const continueBtn = modal.querySelector('.permission-continue');
-            const settingsBtn = modal.querySelector('.permission-settings');
             const overlay = modal.querySelector('.permission-modal-overlay');
             
             closeBtn.addEventListener('click', () => this.hidePermissionModal());
             continueBtn.addEventListener('click', () => this.hidePermissionModal());
-            settingsBtn.addEventListener('click', () => this.openBrowserSettings());
             overlay.addEventListener('click', () => this.hidePermissionModal());
         }
         
@@ -303,33 +380,49 @@ class PermissionManager {
             
             switch (permission) {
                 case 'granted':
-                    statusIcon = '✅';
+                    statusIcon = '[+]';
                     statusText = 'Разрешено';
                     break;
                 case 'denied':
-                    statusIcon = '❌';
+                    statusIcon = '[-]';
                     statusText = 'Запрещено';
                     break;
                 case 'unsupported':
-                    statusIcon = '⚠️';
+                    statusIcon = '[!]';
                     statusText = 'Не поддерживается';
                     break;
                 case 'error':
-                    statusIcon = '⚠️';
+                    statusIcon = '[!]';
                     statusText = 'Ошибка';
                     break;
                 default:
-                    statusIcon = '❓';
+                    statusIcon = '[?]';
                     statusText = 'Неизвестно';
             }
             
+            // Добавляем возможность повторного запроса для запрещенных разрешений
+            const isClickable = (permission === 'denied' || permission === 'prompt');
+            const clickableClass = isClickable ? 'permission-clickable' : '';
+            
             permissionDiv.innerHTML = `
-                <div class="permission-name">${permissionNames[name] || name}</div>
+                <div class="permission-name ${clickableClass}" data-permission="${name}">${permissionNames[name] || name}</div>
                 <div class="permission-status">${statusIcon} ${statusText}</div>
                 ${error ? `<div class="permission-error">${error.message}</div>` : ''}
+                ${isClickable ? `<div class="permission-hint">Нажмите для повторного запроса</div>` : ''}
             `;
             
             permissionList.appendChild(permissionDiv);
+        });
+        
+        // Добавляем обработчики для кликабельных разрешений
+        const clickablePermissions = modal.querySelectorAll('.permission-clickable');
+        clickablePermissions.forEach(element => {
+            element.addEventListener('click', async (e) => {
+                const permissionName = e.target.getAttribute('data-permission');
+                if (permissionName) {
+                    await this.rerequestPermission(permissionName);
+                }
+            });
         });
         
         // Показываем модальное окно
@@ -346,20 +439,176 @@ class PermissionManager {
     }
 
     openBrowserSettings() {
-        // Пытаемся открыть настройки браузера
-        if (navigator.userAgent.includes('Chrome')) {
-            window.open('chrome://settings/content/permissions', '_blank');
-        } else if (navigator.userAgent.includes('Firefox')) {
-            window.open('about:preferences#privacy', '_blank');
-        } else if (navigator.userAgent.includes('Safari')) {
-            window.open('x-apple.systempreferences:com.apple.preference.security?Privacy', '_blank');
-        } else {
-            // Общая инструкция
-            alert('Чтобы изменить разрешения, зайдите в настройки вашего браузера:\n\n' +
-                  'Chrome: chrome://settings/content/permissions\n' +
-                  'Firefox: about:preferences#privacy\n' +
-                  'Safari: Настройки → Конфиденциальность');
+        // Убираем эту функцию так как кнопка настроек удалена
+        console.log('Browser settings button removed');
+    }
+
+    // Метод для повторного запроса конкретного разрешения
+    async rerequestPermission(permissionName) {
+        console.log(`Re-requesting permission: ${permissionName}`);
+        
+        try {
+            const result = await this.requestSpecificPermission(permissionName);
+            console.log(`Re-request result for ${permissionName}:`, result);
+            
+            // Показываем уведомление о результате
+            this.showPermissionUpdateNotification(permissionName, result);
+            
+            // Обновляем модальное окно с актуальной информацией
+            await this.refreshPermissionModal();
+            
+        } catch (error) {
+            console.error(`Error re-requesting ${permissionName}:`, error);
+            this.showPermissionUpdateNotification(permissionName, { permission: 'error', error });
         }
+    }
+
+    // Показать уведомление об обновлении разрешения
+    showPermissionUpdateNotification(permissionName, result) {
+        const permissionNames = {
+            notifications: 'Уведомления',
+            microphone: 'Микрофон',
+            camera: 'Камера',
+            clipboard: 'Буфер обмена',
+            geolocation: 'Геолокация',
+            persistentStorage: 'Постоянное хранилище'
+        };
+        
+        const name = permissionNames[permissionName] || permissionName;
+        let message = '';
+        
+        switch (result.permission) {
+            case 'granted':
+                message = `[+] Разрешение "${name}" предоставлено`;
+                break;
+            case 'denied':
+                message = `[-] Разрешение "${name}" запрещено`;
+                break;
+            case 'error':
+                message = `[!] Ошибка при запросе разрешения "${name}"`;
+                break;
+            default:
+                message = `[?] Статус разрешения "${name}" изменен`;
+        }
+        
+        console.log(message);
+        
+        // Показываем системное уведомление если разрешено
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('REonika - Обновление разрешений', {
+                body: message,
+                icon: '/icon.png'
+            });
+        }
+    }
+
+    // Обновить модальное окно с актуальной информацией
+    async refreshPermissionModal() {
+        // Проверяем все разрешения заново
+        const permissionPromises = [
+            this.checkPermissionStatus('notifications'),
+            this.checkPermissionStatus('microphone'),
+            this.checkPermissionStatus('camera'),
+            this.checkPermissionStatus('clipboard'),
+            this.checkPermissionStatus('geolocation'),
+            this.checkPermissionStatus('persistentStorage')
+        ];
+
+        try {
+            const results = await Promise.allSettled(permissionPromises);
+            
+            // Форматируем результаты для showPermissionModal
+            const formattedResults = results.map((result, index) => {
+                const permissionNames = ['notifications', 'microphone', 'camera', 'clipboard', 'geolocation', 'persistentStorage'];
+                const name = permissionNames[index];
+                return {
+                    value: {
+                        permission: result.value || 'error',
+                        name: name
+                    }
+                };
+            });
+            
+            // Обновляем модальное окно
+            this.updatePermissionModalContent(formattedResults);
+            
+        } catch (error) {
+            console.error('Error refreshing permission modal:', error);
+        }
+    }
+
+    // Обновить содержимое модального окна
+    updatePermissionModalContent(results) {
+        const modal = document.getElementById('permission-modal');
+        if (!modal) return;
+        
+        const permissionList = modal.querySelector('#permission-list');
+        if (!permissionList) return;
+        
+        permissionList.innerHTML = '';
+        
+        const permissionNames = {
+            notifications: 'Уведомления',
+            microphone: 'Микрофон',
+            camera: 'Камера',
+            clipboard: 'Буфер обмена',
+            geolocation: 'Геолокация',
+            persistentStorage: 'Постоянное хранилище'
+        };
+        
+        results.forEach(result => {
+            const { permission, name } = result.value;
+            const permissionDiv = document.createElement('div');
+            permissionDiv.className = `permission-item ${permission}`;
+            
+            let statusIcon = '';
+            let statusText = '';
+            
+            switch (permission) {
+                case 'granted':
+                    statusIcon = '[+]';
+                    statusText = 'Разрешено';
+                    break;
+                case 'denied':
+                    statusIcon = '[-]';
+                    statusText = 'Запрещено';
+                    break;
+                case 'unsupported':
+                    statusIcon = '[!]';
+                    statusText = 'Не поддерживается';
+                    break;
+                case 'error':
+                    statusIcon = '[!]';
+                    statusText = 'Ошибка';
+                    break;
+                default:
+                    statusIcon = '[?]';
+                    statusText = 'Неизвестно';
+            }
+            
+            // Добавляем возможность повторного запроса для запрещенных разрешений
+            const isClickable = (permission === 'denied' || permission === 'prompt');
+            const clickableClass = isClickable ? 'permission-clickable' : '';
+            
+            permissionDiv.innerHTML = `
+                <div class="permission-name ${clickableClass}" data-permission="${name}">${permissionNames[name] || name}</div>
+                <div class="permission-status">${statusIcon} ${statusText}</div>
+                ${isClickable ? `<div class="permission-hint">Нажмите для повторного запроса</div>` : ''}
+            `;
+            
+            permissionList.appendChild(permissionDiv);
+        });
+        
+        // Добавляем обработчики для кликабельных разрешений
+        const clickablePermissions = modal.querySelectorAll('.permission-clickable');
+        clickablePermissions.forEach(element => {
+            element.addEventListener('click', async (e) => {
+                const permissionName = e.target.getAttribute('data-permission');
+                if (permissionName) {
+                    await this.rerequestPermission(permissionName);
+                }
+            });
+        });
     }
 
     // Метод для повторного запроса конкретного разрешения
