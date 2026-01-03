@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" type="image/x-icon" href="icon.png">
-    <link rel="manifest" href="manifest.json">
 </head>
 <body>
     <div id="auth-screen" class="hidden">
@@ -244,7 +243,10 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
     <script type="module" src="supabase.js"></script>
+    <script type="module" src="firebase-config.js"></script>
     <script type="module" src="mobile-session-manager.js"></script>
     <script type="module" src="auth-redirect.js"></script>
     <script type="module" src="mobile-enhancements.js"></script>
@@ -323,11 +325,11 @@
                         console.log('Service Worker зарегистрирован:', registration);
                     })
                     .catch((error) => {
-                        console.error('Ошибка регистрации Service Worker:', error);
+                        console.log('Ошибка регистрации Service Worker:', error);
                     });
             }
         });
-
+        
         function setMobileHeight() {
             const vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
