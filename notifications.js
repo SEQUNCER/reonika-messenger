@@ -1,41 +1,35 @@
-// notifications.js - версия без ES модулей для совместимости
+// notifications.js - НОВАЯ ПРОСТАЯ СИСТЕМА УВЕДОМЛЕНИЙ
 class REonikaNotifications {
     constructor(messenger) {
         this.messenger = messenger;
         this.notificationPermission = 'default';
-        this.fcmToken = null;
+        this.isOnline = navigator.onLine;
         this.init();
     }
 
     async init() {
-        console.log('🚀 Инициализация REonikaNotifications...');
-
-        // Ждем загрузки Firebase
-        await this.waitForFirebase();
+        console.log('🚀 Инициализация новой системы уведомлений...');
 
         // Запрос разрешений на уведомления
         await this.requestPermission();
 
-        // Настройка realtime подписок (сразу, не ждем пользователя)
-        this.setupRealtime();
+        // Настройка онлайн/оффлайн статус
+        this.setupOnlineStatus();
 
-        // Инициализация Firebase Messaging (всегда, токен будет получен при входе)
-        await this.initFirebaseMessaging();
+        // Настройка визуальных индикаторов
+        this.setupVisualIndicators();
 
-        console.log('✅ REonikaNotifications инициализирован');
-    }
+        // Проверяем, авторизован ли пользователь
+        if (this.messenger?.currentUser) {
+            // Получение FCM токена и настройка realtime подписок
+            await this.getFCMToken();
+            this.setupRealtime();
+        } else {
+            // Подписываемся на событие авторизации
+            this.setupAuthListener();
+        }
 
-    async waitForFirebase() {
-        return new Promise((resolve) => {
-            const checkFirebase = () => {
-                if (window.firebaseMessaging && window.firebaseGetToken && window.firebaseOnMessage) {
-                    resolve();
-                } else {
-                    setTimeout(checkFirebase, 100);
-                }
-            };
-            checkFirebase();
-        });
+        console.log('✅ Новая система уведомлений инициализирована');
     }
 
     async requestPermission() {
@@ -54,71 +48,91 @@ class REonikaNotifications {
         }
     }
 
-    async initFirebaseMessaging() {
+    async getFCMToken() {
+        console.log('🔑 Начинаем получение FCM токена...');
+
+        if (!window.firebaseGetToken || !window.firebaseMessaging) {
+            console.log('❌ Firebase messaging не инициализирован');
+            console.log('window.firebaseGetToken:', window.firebaseGetToken);
+            console.log('window.firebaseMessaging:', window.firebaseMessaging);
+            return;
+        }
+
+        if (this.notificationPermission !== 'granted') {
+            console.log('⚠️ Разрешения на уведомления не предоставлены, пропускаем FCM токен');
+            return;
+        }
+
         try {
-            console.log('🔥 Инициализация Firebase Messaging...');
+            console.log('📡 Пытаемся получить FCM токен...');
 
-            // Проверяем, что все компоненты Firebase доступны
-            console.log('Firebase messaging object:', window.firebaseMessaging);
-            console.log('Firebase getToken function:', window.firebaseGetToken);
+            // Сначала попробуем без VAPID ключа для диагностики
+            let token;
+            try {
+                console.log('🔄 Попытка получения токена без VAPID ключа...');
+                token = await window.firebaseGetToken();
+                console.log('✅ Токен получен без VAPID:', !!token);
+            } catch (noVapidError) {
+                console.log('⚠️ Не удалось получить токен без VAPID:', noVapidError.message);
+            }
 
-            // Получение FCM токена
-            console.log('Запрашиваем FCM токен с VAPID key...');
-            this.fcmToken = await window.firebaseGetToken(window.firebaseMessaging, {
-                vapidKey: 'BGkgVqZM0y7uwlJ5RL3gleUfsYWzfzokSjrek3sCpC8KzwcAoXQwuNyp0R8Tfgf9rQjQn9CtIcfgrAcYpeAhDHI'
-            });
+            // Если не получилось, пробуем с VAPID ключом
+            if (!token) {
+                console.log('🔄 Попытка получения токена с VAPID ключом...');
+                // VAPID ключ должен быть сгенерирован в Firebase Console для web push
+                const vapidKey = "BP9MbxkOem3B6DXtLDWIZs3iLzsLNTzZ2_KVnMAgbPvroRO6VmU2NliFmDFI8TJLdsANTJWV8ZBoG51nngk3tQA";
+                console.log('🔑 Используем VAPID ключ:', vapidKey.substring(0, 20) + '...');
 
-            console.log('Результат получения токена:', this.fcmToken);
+                token = await window.firebaseGetToken({
+                    vapidKey: vapidKey
+                });
+            }
 
-            if (this.fcmToken) {
-                console.log('✅ FCM токен получен:', this.fcmToken);
+            if (token) {
+                console.log('✅ FCM токен получен:', token.substring(0, 20) + '...');
+                this.fcmToken = token;
 
-                // Сохраняем токен в базе данных для пользователя
-                await this.saveTokenToDatabase();
+                // Сохраняем токен в базе данных
+                await this.saveFCMTokenToDatabase(token);
 
-                // Обработка сообщений в foreground
-                window.firebaseOnMessage(window.firebaseMessaging, (payload) => {
-                    console.log('📱 Сообщение в foreground:', payload);
+                // Настраиваем обработчик сообщений
+                window.firebaseOnMessage((payload) => {
+                    console.log('📨 Получено сообщение в foreground:', payload);
                     this.showNotificationFromPayload(payload);
                 });
 
-                console.log('✅ Firebase Messaging инициализирован');
             } else {
-                console.log('❌ Не удалось получить FCM токен - токен пустой');
-                console.log('Возможные причины:');
-                console.log('1. VAPID key неправильный');
-                console.log('2. FCM API не включен в Firebase Console');
-                console.log('3. Сайт не на HTTPS (localhost может работать)');
-                console.log('4. Разрешения на уведомления не предоставлены');
+                console.log('❌ FCM токен не получен ни одним способом');
+                console.log('💡 Возможные причины:');
+                console.log('   - Неправильный VAPID ключ');
+                console.log('   - Приложение не запущено на HTTPS (для продакшена)');
+                console.log('   - Firebase проект не настроен для web push');
             }
         } catch (error) {
-            console.error('❌ Ошибка инициализации FCM:', error);
-            console.error('Детали ошибки:', error.message);
-            console.error('Stack trace:', error.stack);
-
-            if (error.code) {
-                console.error('Код ошибки:', error.code);
-            }
+            console.error('❌ Ошибка получения FCM токена:', error);
+            console.error('Детали ошибки:', error);
         }
     }
 
-    async saveTokenToDatabase() {
-        if (!this.fcmToken || !this.messenger?.currentUser?.id) return;
+    async saveFCMTokenToDatabase(token) {
+        if (!this.messenger?.currentUser?.id) {
+            console.log('⚠️ Пользователь не авторизован, токен не сохранен');
+            return;
+        }
 
         try {
-            // Сохраняем токен в таблице user_fcm_tokens или profiles
             const { error } = await supabase
                 .from('profiles')
-                .update({ fcm_token: this.fcmToken })
+                .update({ fcm_token: token })
                 .eq('id', this.messenger.currentUser.id);
 
             if (error) {
-                console.error('Ошибка сохранения FCM токена:', error);
+                console.error('❌ Ошибка сохранения FCM токена в базу данных:', error);
             } else {
-                console.log('FCM токен сохранен в базе данных');
+                console.log('✅ FCM токен сохранен в базу данных');
             }
         } catch (error) {
-            console.error('Ошибка сохранения токена:', error);
+            console.error('❌ Ошибка сохранения FCM токена:', error);
         }
     }
 
@@ -128,9 +142,12 @@ class REonikaNotifications {
         const userId = this.messenger.currentUser?.id;
         if (!userId) return;
 
+        console.log('📡 Настройка realtime подписок для уведомлений...');
+
         // Подписка на новые сообщения в чатах пользователя
-        const subscription = supabase
-            .channel('new-messages')
+        // Используем тот же канал, что и в app.js
+        const messageSubscription = supabase
+            .channel('messages')
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -141,14 +158,88 @@ class REonikaNotifications {
                 // Проверяем, что сообщение не от самого пользователя
                 if (message.sender_id === userId) return;
 
-                // Всегда отправляем push-уведомление при новом сообщении
-                // (даже если пользователь не в этом чате на UI)
-                console.log('Новое сообщение для отправки уведомления:', message);
-                await this.sendPushNotification(message);
+                console.log('📨 Новое сообщение для уведомления:', message);
+                await this.handleNewMessage(message);
             })
             .subscribe();
 
-        this.messenger.realtimeSubscriptions.push(subscription);
+        // Подписка на изменения статуса пользователей
+        const presenceSubscription = supabase
+            .channel('presence-updates')
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'profiles',
+                filter: `id=neq.${userId}`
+            }, (payload) => {
+                console.log('👤 Изменение статуса пользователя:', payload);
+                this.handlePresenceUpdate(payload);
+            })
+            .subscribe();
+
+        this.messenger.realtimeSubscriptions.push(messageSubscription);
+        this.messenger.realtimeSubscriptions.push(presenceSubscription);
+    }
+
+    async handleNewMessage(message) {
+        try {
+            // Получаем данные отправителя
+            const { data: sender } = await supabase
+                .from('profiles')
+                .select('username, avatar_url')
+                .eq('id', message.sender_id)
+                .single();
+
+            if (!sender) return;
+
+            // Определяем тип уведомления
+            const notificationType = this.getNotificationType(message);
+
+            // Отправляем уведомление выбранного типа
+            await this.sendNotificationByType(notificationType, sender, message);
+
+            // Визуальные индикаторы
+            this.updateVisualIndicators();
+
+        } catch (error) {
+            console.error('❌ Ошибка обработки нового сообщения:', error);
+        }
+    }
+
+    async sendNotificationByType(type, sender, message) {
+        switch (type) {
+            case 'push':
+                await this.sendPushNotification(message);
+                break;
+            case 'local':
+                this.sendLocalNotification(sender, message);
+                break;
+            case 'sound':
+                // Только звук - можно добавить позже
+                console.log('🔊 Только звук для уведомления');
+                break;
+            default:
+                console.log('⚠️ Неизвестный тип уведомления:', type);
+        }
+    }
+
+    getNotificationType(message) {
+        // Логика определения типа уведомления
+        const isPageVisible = !document.hidden;
+        const isChatOpen = this.isCurrentChat(message.chat_id);
+
+        if (!isPageVisible) {
+            return 'push'; // Push-уведомление если страница не видна
+        } else if (!isChatOpen) {
+            return 'local'; // Локальное уведомление если чат не открыт
+        } else {
+            return 'sound'; // Только звук если чат открыт
+        }
+    }
+
+    isCurrentChat(chatId) {
+        // Проверяем, открыт ли данный чат
+        return this.messenger?.currentChat?.id === chatId;
     }
 
     async sendPushNotification(message) {
@@ -267,6 +358,67 @@ class REonikaNotifications {
             icon: notification.icon || '/icon.png',
             data: data
         });
+    }
+
+    setupOnlineStatus() {
+        // Настройка обработчиков онлайн/оффлайн статуса
+        window.addEventListener('online', () => {
+            this.isOnline = true;
+            console.log('🌐 Подключение восстановлено');
+        });
+
+        window.addEventListener('offline', () => {
+            this.isOnline = false;
+            console.log('📴 Подключение потеряно');
+        });
+    }
+
+    setupVisualIndicators() {
+        // Настройка визуальных индикаторов (можно расширить позже)
+        console.log('👁️ Визуальные индикаторы настроены');
+    }
+
+    setupVisibilityHandlers() {
+        // Обработчики видимости страницы
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('📱 Страница скрыта');
+            } else {
+                console.log('📱 Страница видна');
+            }
+        });
+    }
+
+    updateVisualIndicators() {
+        // Обновление визуальных индикаторов (можно расширить позже)
+        // Например, обновление счетчиков уведомлений
+    }
+
+    handlePresenceUpdate(payload) {
+        // Обработка обновлений статуса присутствия
+        console.log('👤 Обновление статуса присутствия:', payload);
+    }
+
+    setupAuthListener() {
+        // Слушаем события авторизации от messenger
+        if (this.messenger && typeof this.messenger.addEventListener === 'function') {
+            this.messenger.addEventListener('userSignedIn', async () => {
+                console.log('👤 Пользователь авторизовался, инициализируем уведомления...');
+                await this.getFCMToken();
+                this.setupRealtime();
+            });
+        } else {
+            // Fallback: проверяем каждые 2 секунды
+            console.log('⚠️ Messenger не имеет addEventListener, используем polling');
+            this.authCheckInterval = setInterval(async () => {
+                if (this.messenger?.currentUser && !this.fcmToken) {
+                    console.log('👤 Пользователь авторизовался (polling), инициализируем уведомления...');
+                    await this.getFCMToken();
+                    this.setupRealtime();
+                    clearInterval(this.authCheckInterval);
+                }
+            }, 2000);
+        }
     }
 }
 
@@ -414,6 +566,40 @@ window.testLocalNotification = () => {
         );
     } else {
         console.error('❌ Notifications не инициализирован');
+    }
+};
+
+// Тест получения FCM токена вручную
+window.testFCMToken = async () => {
+    console.log('🔑 Тестируем получение FCM токена вручную...');
+
+    if (!window.firebaseGetToken) {
+        console.error('❌ Firebase не инициализирован');
+        return;
+    }
+
+    try {
+        console.log('🔄 Попытка без VAPID...');
+        const token1 = await window.firebaseGetToken();
+        console.log('Результат без VAPID:', token1 ? 'УСПЕХ' : 'НЕТ ТОКЕНА');
+
+        console.log('🔄 Попытка с VAPID...');
+        const vapidKey = "BP9MbxkOem3B6DXtLDWIZs3iLzsLNTzZ2_KVnMAgbPvroRO6VmU2NliFmDFI8TJLdsANTJWV8ZBoG51nngk3tQA";
+        const token2 = await window.firebaseGetToken({ vapidKey });
+        console.log('Результат с VAPID:', token2 ? 'УСПЕХ' : 'НЕТ ТОКЕНА');
+
+        if (token2) {
+            console.log('✅ FCM токен получен:', token2);
+            return token2;
+        } else {
+            console.log('❌ FCM токен не получен');
+            console.log('💡 Возможные причины:');
+            console.log('   - Неправильный VAPID ключ');
+            console.log('   - Firebase проект не настроен для web push');
+            console.log('   - Сертификат сайта не HTTPS');
+        }
+    } catch (error) {
+        console.error('❌ Ошибка при получении токена:', error);
     }
 };
 
