@@ -1,13 +1,13 @@
 // firebase-config.js - версия для обычных скриптов
 const firebaseConfig = {
-    apiKey: "AIzaSyDCk6bvEna6FB8P0B2B0Hq7Rs_kPB-qmy0",
-    authDomain: "reonika-push.firebaseapp.com",
-    projectId: "reonika-push",
-    storageBucket: "reonika-push.appspot.com",
-    messagingSenderId: "1092234073124",
-    appId: "1:1092234073124:web:a63fdc322aa0ef4a82b4b1"
+  apiKey: "AIzaSyDCk6bvEna6FB8P0B2B0Hq7Rs_kPB-qmy0",
+  authDomain: "reonika-push.firebaseapp.com",
+  projectId: "reonika-push",
+  storageBucket: "reonika-push.firebasestorage.app",
+  messagingSenderId: "1092234073124",
+  appId: "1:1092234073124:web:ba129172c46be93082b4b1",
+  measurementId: "G-5SZVKVJ5QT"
 };
-
 console.log('🔥 Начинаем инициализацию Firebase...');
 
 // Проверяем доступность Firebase

@@ -80,7 +80,7 @@ class REonikaNotifications {
             if (!token) {
                 console.log('🔄 Попытка получения токена с VAPID ключом...');
                 // VAPID ключ должен быть сгенерирован в Firebase Console для web push
-                const vapidKey = "BP9MbxkOem3B6DXtLDWIZs3iLzsLNTzZ2_KVnMAgbPvroRO6VmU2NliFmDFI8TJLdsANTJWV8ZBoG51nngk3tQA";
+                const vapidKey = "BG5rDZu0VyH3jg7K6IM2X6g2dbdLxS3LlR9GAUFEjkpUHdSIs5LQo5w5lrglPcaR1gHUeBULBrl4_DS2GFDEDVs";
                 console.log('🔑 Используем VAPID ключ:', vapidKey.substring(0, 20) + '...');
 
                 token = await window.firebaseGetToken({
