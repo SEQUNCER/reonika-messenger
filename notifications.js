@@ -174,28 +174,73 @@ class REonikaNotifications {
             // Определяем получателя (другого участника чата)
             const receiverId = chat.user1_id === message.sender_id ? chat.user2_id : chat.user1_id;
 
-            try {
-                // Вызываем Supabase Edge Function для отправки push-уведомления
-                const { data, error } = await supabase.functions.invoke('send-notification', {
-                    body: {
-                        receiver_id: receiverId,
-                        sender_id: message.sender_id,
-                        message_content: message.content,
-                        chat_id: message.chat_id
-                    }
-                });
+            // Проверяем, есть ли FCM токен для отправки push-уведомления
+            if (this.fcmToken && this.notificationPermission === 'granted') {
+                try {
+                    // Вызываем Supabase Edge Function для отправки push-уведомления
+                    const { data, error } = await supabase.functions.invoke('send-notification', {
+                        body: {
+                            receiver_id: receiverId,
+                            sender_id: message.sender_id,
+                            message_content: message.content,
+                            chat_id: message.chat_id
+                        }
+                    });
 
-                if (error) {
-                    console.error('Ошибка вызова функции уведомлений:', error);
-                } else {
-                    console.log('Push-уведомление отправлено:', data);
+                    if (error) {
+                        console.error('Ошибка вызова функции уведомлений:', error);
+                        // Fallback: локальное уведомление
+                        this.sendLocalNotification(sender, message);
+                    } else {
+                        console.log('✅ Push-уведомление отправлено через FCM:', data);
+                    }
+                } catch (funcError) {
+                    console.error('❌ Ошибка отправки push-уведомления, используем локальное:', funcError);
+                    // Fallback: локальное уведомление
+                    this.sendLocalNotification(sender, message);
                 }
-            } catch (funcError) {
-                console.error('Ошибка отправки push-уведомления пользователю:', receiverId, funcError);
+            } else {
+                console.log('⚠️ FCM не доступен, используем локальное уведомление');
+                // Fallback: локальное уведомление
+                this.sendLocalNotification(sender, message);
             }
 
         } catch (error) {
-            console.error('Ошибка отправки push-уведомлений:', error);
+            console.error('❌ Ошибка отправки уведомлений:', error);
+            // Emergency fallback
+            try {
+                this.sendLocalNotification({ username: 'REonika' }, message);
+            } catch (fallbackError) {
+                console.error('❌ Даже локальное уведомление не работает:', fallbackError);
+            }
+        }
+    }
+
+    // Метод для отправки локальных уведомлений (работает всегда)
+    sendLocalNotification(sender, message) {
+        if (this.notificationPermission !== 'granted') {
+            console.log('⚠️ Разрешения на уведомления не предоставлены');
+            return;
+        }
+
+        try {
+            const notification = new Notification('Новое сообщение в REonika', {
+                body: `${sender.username}: ${message.content || 'Голосовое/Изображение'}`,
+                icon: '/icon.png',
+                badge: '/icon.png',
+                tag: 'reonika-message',
+                requireInteraction: true
+            });
+
+            console.log('✅ Локальное уведомление показано');
+
+            // Автоматически закрываем через 5 секунд
+            setTimeout(() => {
+                notification.close();
+            }, 5000);
+
+        } catch (error) {
+            console.error('❌ Ошибка показа локального уведомления:', error);
         }
     }
 
@@ -357,6 +402,19 @@ window.simpleTest = () => {
     console.log('🎯 Простой тест: notifications.js загружен');
     console.log('window.notifications:', window.notifications);
     console.log('window.messenger:', window.messenger);
+};
+
+// Тестовое уведомление
+window.testLocalNotification = () => {
+    console.log('🔔 Тестируем локальное уведомление...');
+    if (window.notifications) {
+        window.notifications.sendLocalNotification(
+            { username: 'Тест' },
+            { content: 'Это тестовое уведомление!' }
+        );
+    } else {
+        console.error('❌ Notifications не инициализирован');
+    }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
