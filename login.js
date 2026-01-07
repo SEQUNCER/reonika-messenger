@@ -39,39 +39,12 @@ class LoginManager {
     }
 
     initAuthStateListener() {
-        supabase.auth.onAuthStateChange(async (event, session) => {
+        supabase.auth.onAuthStateChange((event, session) => {
             console.log('Auth state changed:', event, session);
 
             switch (event) {
                 case 'SIGNED_IN':
-                    console.log('User signed in, requesting notification permission...');
-
-                    // Запрашиваем разрешение на уведомления сразу после входа
-                    if ('Notification' in window) {
-                        try {
-                            console.log('🔔 Запрашиваем разрешение на уведомления...');
-
-                            // Показываем сообщение пользователю
-                            this.showNotification('Запрашиваем разрешение на уведомления...', 'info');
-
-                            const permission = await Notification.requestPermission();
-                            console.log('Notification permission after login:', permission);
-
-                            if (permission === 'granted') {
-                                console.log('✅ Разрешение на уведомления получено после входа');
-                                this.showNotification('Уведомления включены! Вы будете получать оповещения о новых сообщениях.', 'success');
-                            } else {
-                                console.log('❌ Разрешение на уведомления отклонено');
-                                this.showNotification('Уведомления отключены. Вы можете включить их позже в настройках браузера.', 'info');
-                            }
-                        } catch (error) {
-                            console.error('Error requesting notification permission:', error);
-                            this.showNotification('Ошибка при запросе разрешений на уведомления.', 'error');
-                        }
-                    } else {
-                        console.log('❌ Notifications API не поддерживается этим браузером');
-                    }
-
+                    console.log('User signed in, redirecting to main app');
                     // Небольшая задержка для сохранения сессии
                     setTimeout(() => {
                         this.redirectToMainApp();

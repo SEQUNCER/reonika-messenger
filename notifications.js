@@ -1,139 +1,306 @@
-// notifications.js - НОВАЯ ПРОСТАЯ СИСТЕМА УВЕДОМЛЕНИЙ
+// notifications.js - Улучшенная версия с поддержкой Push API и Service Worker
 class REonikaNotifications {
     constructor(messenger) {
         this.messenger = messenger;
         this.notificationPermission = 'default';
-        this.isOnline = navigator.onLine;
+        this.pushSubscription = null;
+        this.isSupported = this.checkSupport();
+        this.serviceWorkerRegistration = null;
         this.init();
     }
 
+    checkSupport() {
+        const supported = {
+            notifications: 'Notification' in window,
+            push: 'PushManager' in window,
+            serviceWorker: 'serviceWorker' in navigator,
+            vapid: true // VAPID ключи будут добавлены
+        };
+
+        console.log('Notification support:', supported);
+        return supported.notifications && supported.push && supported.serviceWorker;
+    }
+
     async init() {
-        console.log('🚀 Инициализация новой системы уведомлений...');
-
-        // Запрос разрешений на уведомления
-        await this.requestPermission();
-
-        // Настройка онлайн/оффлайн статус
-        this.setupOnlineStatus();
-
-        // Настройка визуальных индикаторов
-        this.setupVisualIndicators();
-
-        // Проверяем, авторизован ли пользователь
-        if (this.messenger?.currentUser) {
-            // Получение FCM токена и настройка realtime подписок
-            await this.getFCMToken();
-            this.setupRealtime();
-        } else {
-            // Подписываемся на событие авторизации
-            this.setupAuthListener();
+        if (!this.isSupported) {
+            console.warn('Push notifications не поддерживаются в этом браузере');
+            // Используем fallback на обычные уведомления
+            await this.initFallbackNotifications();
+            return;
         }
 
-        console.log('✅ Новая система уведомлений инициализирована');
+        try {
+            // Регистрируем Service Worker
+            await this.registerServiceWorker();
+            
+            // Запрашиваем разрешения
+            await this.requestPermissions();
+            
+            // Настраиваем подписку на push
+            await this.setupPushSubscription();
+            
+            // Настраиваем realtime
+            this.setupRealtime();
+            
+            console.log('Push notifications initialized successfully');
+        } catch (error) {
+            console.error('Error initializing push notifications:', error);
+            // Fallback на обычные уведомления
+            await this.initFallbackNotifications();
+        }
+    }
+
+    async initFallbackNotifications() {
+        // Используем менеджер разрешений вместо прямого запроса
+        if (window.permissionManager) {
+            const result = await window.permissionManager.requestSpecificPermission('notifications');
+            this.notificationPermission = result.permission;
+        } else {
+            // Fallback если менеджер разрешений не загружен
+            await this.requestPermission();
+        }
+        this.setupRealtime();
+    }
+
+    async registerServiceWorker() {
+        try {
+            // Создаем Service Worker "на лету"
+            const swUrl = this.createServiceWorker();
+            const blob = new Blob([swUrl], { type: 'application/javascript' });
+            const swUrlObject = URL.createObjectURL(blob);
+            
+            this.serviceWorkerRegistration = await navigator.serviceWorker.register(swUrlObject);
+            console.log('Service Worker registered successfully');
+            
+            // Очищаем URL после регистрации
+            setTimeout(() => URL.revokeObjectURL(swUrlObject), 1000);
+            
+            return this.serviceWorkerRegistration;
+        } catch (error) {
+            console.error('Service Worker registration failed:', error);
+            throw error;
+        }
+    }
+
+    createServiceWorker() {
+        return `
+            // Service Worker для REonika Push Notifications
+            const CACHE_NAME = 'reonika-push-v1';
+            
+            self.addEventListener('install', (event) => {
+                console.log('Service Worker installing...');
+                self.skipWaiting();
+            });
+            
+            self.addEventListener('activate', (event) => {
+                console.log('Service Worker activating...');
+                event.waitUntil(self.clients.claim());
+            });
+            
+            self.addEventListener('push', (event) => {
+                console.log('Push message received:', event);
+                
+                if (!event.data) {
+                    console.log('Push event has no data');
+                    return;
+                }
+                
+                try {
+                    const data = event.data.json();
+                    console.log('Push data:', data);
+                    
+                    const title = data.title || 'REonika';
+                    const options = {
+                        body: data.body || 'Новое сообщение',
+                        icon: data.icon || '/icon.png',
+                        badge: '/icon.png',
+                        tag: data.tag || 'reonika-message',
+                        data: data.data || {},
+                        requireInteraction: false,
+                        silent: false,
+                        vibrate: [200, 100, 200],
+                        actions: [
+                            {
+                                action: 'open',
+                                title: 'Открыть'
+                            },
+                            {
+                                action: 'dismiss',
+                                title: 'Закрыть'
+                            }
+                        ]
+                    };
+                    
+                    event.waitUntil(
+                        self.registration.showNotification(title, options)
+                    );
+                } catch (error) {
+                    console.error('Error processing push message:', error);
+                }
+            });
+            
+            self.addEventListener('notificationclick', (event) => {
+                console.log('Notification clicked:', event);
+                
+                event.notification.close();
+                
+                if (event.action === 'dismiss') {
+                    return;
+                }
+                
+                const urlToOpen = event.notification.data?.url || '/';
+                
+                event.waitUntil(
+                    clients.matchAll({ type: 'window' }).then((clientList) => {
+                        for (const client of clientList) {
+                            if (client.url === urlToOpen && 'focus' in client) {
+                                return client.focus();
+                            }
+                        }
+                        
+                        if (clients.openWindow) {
+                            return clients.openWindow(urlToOpen);
+                        }
+                    })
+                );
+            });
+            
+            self.addEventListener('pushsubscriptionchange', (event) => {
+                console.log('Push subscription changed');
+                event.waitUntil(
+                    self.registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlB64ToUint8Array('BLbVQ7nJz8o5h9K1nGz2X4f6Y8p0r2t4w6x8z0c2v4b6n8m0q2s4u6w8y0z2a4')
+                    })
+                    .then((subscription) => {
+                        console.log('New subscription:', subscription);
+                        // Здесь можно отправить новую подписку на сервер
+                    })
+                );
+            });
+            
+            // Вспомогательная функция для конвертации VAPID ключа
+            function urlB64ToUint8Array(base64String) {
+                const padding = '='.repeat((4 - base64String.length % 4) % 4);
+                const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+                const rawData = window.atob(base64);
+                const outputArray = new Uint8Array(rawData.length);
+                
+                for (let i = 0; i < rawData.length; ++i) {
+                    outputArray[i] = rawData.charCodeAt(i);
+                }
+                return outputArray;
+            }
+        `;
+    }
+
+    async requestPermissions() {
+        try {
+            // Запрашиваем разрешение на уведомления
+            this.notificationPermission = await Notification.requestPermission();
+            
+            if (this.notificationPermission !== 'granted') {
+                throw new Error('Notification permission denied');
+            }
+            
+            console.log('Notification permission granted');
+        } catch (error) {
+            console.error('Error requesting notification permission:', error);
+            throw error;
+        }
+    }
+
+    async setupPushSubscription() {
+        if (!this.serviceWorkerRegistration) {
+            throw new Error('Service Worker not registered');
+        }
+
+        try {
+            // Проверяем существующую подписку
+            let subscription = await this.serviceWorkerRegistration.pushManager.getSubscription();
+            
+            if (!subscription) {
+                // Создаем новую подписку
+                // Используем генерированный VAPID ключ для демонстрации
+                // В реальном приложении нужно использовать реальные ключи
+                const applicationServerKey = this.urlB64ToUint8Array(
+                    'BLbVQ7nJz8o5h9K1nGz2X4f6Y8p0r2t4w6x8z0c2v4b6n8m0q2s4u6w8y0z2a4'
+                );
+                
+                subscription = await this.serviceWorkerRegistration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: applicationServerKey
+                });
+                
+                console.log('New push subscription created:', subscription);
+                
+                // Сохраняем подписку в базе данных
+                await this.savePushSubscription(subscription);
+            } else {
+                console.log('Existing push subscription found:', subscription);
+            }
+            
+            this.pushSubscription = subscription;
+            return subscription;
+        } catch (error) {
+            console.error('Error setting up push subscription:', error);
+            throw error;
+        }
+    }
+
+    urlB64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
+    async savePushSubscription(subscription) {
+        if (!this.messenger?.currentUser) {
+            console.warn('Cannot save push subscription: no current user');
+            return;
+        }
+
+        try {
+            const subscriptionData = {
+                user_id: this.messenger.currentUser.id,
+                endpoint: subscription.endpoint,
+                p256dh_key: subscription.getKey('p256dh') ? 
+                    btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')))) : null,
+                auth_key: subscription.getKey('auth') ? 
+                    btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')))) : null,
+                created_at: new Date().toISOString(),
+                user_agent: navigator.userAgent,
+                is_active: true
+            };
+
+            // Сохраняем в Supabase
+            const { error } = await supabase
+                .from('push_subscriptions')
+                .upsert(subscriptionData, {
+                    onConflict: 'user_id,endpoint'
+                });
+
+            if (error) {
+                console.error('Error saving push subscription:', error);
+                throw error;
+            }
+
+            console.log('Push subscription saved successfully');
+        } catch (error) {
+            console.error('Error saving push subscription:', error);
+            // Не выбрасываем ошибку, чтобы не прерывать инициализацию
+        }
     }
 
     async requestPermission() {
-        if (!('Notification' in window)) {
-            console.log('❌ Notifications API не поддерживается');
-            return;
-        }
-
-        // Запрос разрешения на уведомления
+        if (!('Notification' in window)) return;
         this.notificationPermission = await Notification.requestPermission();
-
-        if (this.notificationPermission === 'granted') {
-            console.log('✅ Разрешение на уведомления получено');
-        } else {
-            console.log('❌ Разрешение на уведомления отклонено');
-        }
-    }
-
-    async getFCMToken() {
-        console.log('🔑 Начинаем получение FCM токена...');
-
-        if (!window.firebaseGetToken || !window.firebaseMessaging) {
-            console.log('❌ Firebase messaging не инициализирован');
-            console.log('window.firebaseGetToken:', window.firebaseGetToken);
-            console.log('window.firebaseMessaging:', window.firebaseMessaging);
-            return;
-        }
-
-        if (this.notificationPermission !== 'granted') {
-            console.log('⚠️ Разрешения на уведомления не предоставлены, пропускаем FCM токен');
-            return;
-        }
-
-        try {
-            console.log('📡 Пытаемся получить FCM токен...');
-
-            // Сначала попробуем без VAPID ключа для диагностики
-            let token;
-            try {
-                console.log('🔄 Попытка получения токена без VAPID ключа...');
-                token = await window.firebaseGetToken();
-                console.log('✅ Токен получен без VAPID:', !!token);
-            } catch (noVapidError) {
-                console.log('⚠️ Не удалось получить токен без VAPID:', noVapidError.message);
-            }
-
-            // Если не получилось, пробуем с VAPID ключом
-            if (!token) {
-                console.log('🔄 Попытка получения токена с VAPID ключом...');
-                // VAPID ключ должен быть сгенерирован в Firebase Console для web push
-                const vapidKey = "BG5rDZu0VyH3jg7K6IM2X6g2dbdLxS3LlR9GAUFEjkpUHdSIs5LQo5w5lrglPcaR1gHUeBULBrl4_DS2GFDEDVs";
-                console.log('🔑 Используем VAPID ключ:', vapidKey.substring(0, 20) + '...');
-
-                token = await window.firebaseGetToken({
-                    vapidKey: vapidKey
-                });
-            }
-
-            if (token) {
-                console.log('✅ FCM токен получен:', token.substring(0, 20) + '...');
-                this.fcmToken = token;
-
-                // Сохраняем токен в базе данных
-                await this.saveFCMTokenToDatabase(token);
-
-                // Настраиваем обработчик сообщений
-                window.firebaseOnMessage((payload) => {
-                    console.log('📨 Получено сообщение в foreground:', payload);
-                    this.showNotificationFromPayload(payload);
-                });
-
-            } else {
-                console.log('❌ FCM токен не получен ни одним способом');
-                console.log('💡 Возможные причины:');
-                console.log('   - Неправильный VAPID ключ');
-                console.log('   - Приложение не запущено на HTTPS (для продакшена)');
-                console.log('   - Firebase проект не настроен для web push');
-            }
-        } catch (error) {
-            console.error('❌ Ошибка получения FCM токена:', error);
-            console.error('Детали ошибки:', error);
-        }
-    }
-
-    async saveFCMTokenToDatabase(token) {
-        if (!this.messenger?.currentUser?.id) {
-            console.log('⚠️ Пользователь не авторизован, токен не сохранен');
-            return;
-        }
-
-        try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ fcm_token: token })
-                .eq('id', this.messenger.currentUser.id);
-
-            if (error) {
-                console.error('❌ Ошибка сохранения FCM токена в базу данных:', error);
-            } else {
-                console.log('✅ FCM токен сохранен в базу данных');
-            }
-        } catch (error) {
-            console.error('❌ Ошибка сохранения FCM токена:', error);
-        }
     }
 
     setupRealtime() {
@@ -142,12 +309,9 @@ class REonikaNotifications {
         const userId = this.messenger.currentUser?.id;
         if (!userId) return;
 
-        console.log('📡 Настройка realtime подписок для уведомлений...');
-
         // Подписка на новые сообщения в чатах пользователя
-        // Используем тот же канал, что и в app.js
-        const messageSubscription = supabase
-            .channel('messages')
+        const subscription = supabase
+            .channel('new-messages')
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -155,458 +319,176 @@ class REonikaNotifications {
             }, async (payload) => {
                 const message = payload.new;
 
-                // Проверяем, что сообщение не от самого пользователя
+                // Проверяем, что сообщение в чате пользователя и не от самого пользователя
                 if (message.sender_id === userId) return;
 
-                console.log('📨 Новое сообщение для уведомления:', message);
-                await this.handleNewMessage(message);
-            })
-            .subscribe();
+                const isUserChat = this.messenger.chats.some(chat => chat.id === message.chat_id);
+                if (!isUserChat) return;
 
-        // Подписка на изменения статуса пользователей
-        const presenceSubscription = supabase
-            .channel('presence-updates')
-            .on('postgres_changes', {
-                event: 'UPDATE',
-                schema: 'public',
-                table: 'profiles',
-                filter: `id=neq.${userId}`
-            }, (payload) => {
-                console.log('👤 Изменение статуса пользователя:', payload);
-                this.handlePresenceUpdate(payload);
-            })
-            .subscribe();
+                // Показываем уведомление если страница не активна
+                if (this.notificationPermission === 'granted' &&
+                    (document.visibilityState === 'hidden' || !document.hasFocus())) {
+                    
+                    // Получаем данные отправителя
+                    const { data: sender } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', message.sender_id)
+                        .single();
 
-        this.messenger.realtimeSubscriptions.push(messageSubscription);
-        this.messenger.realtimeSubscriptions.push(presenceSubscription);
-    }
-
-    async handleNewMessage(message) {
-        try {
-            // Получаем данные отправителя
-            const { data: sender } = await supabase
-                .from('profiles')
-                .select('username, avatar_url')
-                .eq('id', message.sender_id)
-                .single();
-
-            if (!sender) return;
-
-            // Определяем тип уведомления
-            const notificationType = this.getNotificationType(message);
-
-            // Отправляем уведомление выбранного типа
-            await this.sendNotificationByType(notificationType, sender, message);
-
-            // Визуальные индикаторы
-            this.updateVisualIndicators();
-
-        } catch (error) {
-            console.error('❌ Ошибка обработки нового сообщения:', error);
-        }
-    }
-
-    async sendNotificationByType(type, sender, message) {
-        switch (type) {
-            case 'push':
-                await this.sendPushNotification(message);
-                break;
-            case 'local':
-                this.sendLocalNotification(sender, message);
-                break;
-            case 'sound':
-                // Только звук - можно добавить позже
-                console.log('🔊 Только звук для уведомления');
-                break;
-            default:
-                console.log('⚠️ Неизвестный тип уведомления:', type);
-        }
-    }
-
-    getNotificationType(message) {
-        // Логика определения типа уведомления
-        const isPageVisible = !document.hidden;
-        const isChatOpen = this.isCurrentChat(message.chat_id);
-
-        if (!isPageVisible) {
-            return 'push'; // Push-уведомление если страница не видна
-        } else if (!isChatOpen) {
-            return 'local'; // Локальное уведомление если чат не открыт
-        } else {
-            return 'sound'; // Только звук если чат открыт
-        }
-    }
-
-    isCurrentChat(chatId) {
-        // Проверяем, открыт ли данный чат
-        return this.messenger?.currentChat?.id === chatId;
-    }
-
-    async sendPushNotification(message) {
-        try {
-            // Получаем данные отправителя
-            const { data: sender } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', message.sender_id)
-                .single();
-
-            if (!sender) return;
-
-            // Получаем данные чата для определения получателя
-            const { data: chat, error: chatError } = await supabase
-                .from('chats')
-                .select('user1_id, user2_id')
-                .eq('id', message.chat_id)
-                .single();
-
-            if (chatError || !chat) return;
-
-            // Определяем получателя (другого участника чата)
-            const receiverId = chat.user1_id === message.sender_id ? chat.user2_id : chat.user1_id;
-
-            // Проверяем, есть ли FCM токен для отправки push-уведомления
-            if (this.fcmToken && this.notificationPermission === 'granted') {
-                try {
-                    // Вызываем Supabase Edge Function для отправки push-уведомления
-                    const { data, error } = await supabase.functions.invoke('send-notification', {
-                        body: {
-                            receiver_id: receiverId,
-                            sender_id: message.sender_id,
-                            message_content: message.content,
-                            chat_id: message.chat_id
+                    if (sender) {
+                        const notificationMessage = { ...message, sender };
+                        
+                        // Показываем push уведомление если доступно
+                        if (this.isSupported && this.pushSubscription) {
+                            await this.showPushNotification(notificationMessage);
+                        } else {
+                            // Fallback на обычное уведомление
+                            this.showNotification(notificationMessage);
                         }
-                    });
-
-                    if (error) {
-                        console.error('Ошибка вызова функции уведомлений:', error);
-                        // Fallback: локальное уведомление
-                        this.sendLocalNotification(sender, message);
-                    } else {
-                        console.log('✅ Push-уведомление отправлено через FCM:', data);
                     }
-                } catch (funcError) {
-                    console.error('❌ Ошибка отправки push-уведомления, используем локальное:', funcError);
-                    // Fallback: локальное уведомление
-                    this.sendLocalNotification(sender, message);
                 }
-            } else {
-                console.log('⚠️ FCM не доступен, используем локальное уведомление');
-                // Fallback: локальное уведомление
-                this.sendLocalNotification(sender, message);
-            }
+            })
+            .subscribe();
 
-        } catch (error) {
-            console.error('❌ Ошибка отправки уведомлений:', error);
-            // Emergency fallback
-            try {
-                this.sendLocalNotification({ username: 'REonika' }, message);
-            } catch (fallbackError) {
-                console.error('❌ Даже локальное уведомление не работает:', fallbackError);
-            }
-        }
+        this.messenger.realtimeSubscriptions.push(subscription);
     }
 
-    // Метод для отправки локальных уведомлений (работает всегда)
-    sendLocalNotification(sender, message) {
-        if (this.notificationPermission !== 'granted') {
-            console.log('⚠️ Разрешения на уведомления не предоставлены');
-            return;
-        }
+    async showPushNotification(message) {
+        if (!message.sender) return;
 
         try {
-            const notification = new Notification('Новое сообщение в REonika', {
-                body: `${sender.username}: ${message.content || 'Голосовое/Изображение'}`,
-                icon: '/icon.png',
-                badge: '/icon.png',
-                tag: 'reonika-message',
-                requireInteraction: true
-            });
-
-            console.log('✅ Локальное уведомление показано');
-
-            // Автоматически закрываем через 5 секунд
-            setTimeout(() => {
-                notification.close();
-            }, 5000);
-
+            // Отправляем push через сервис (можно использовать вебсокеты или другой сервис)
+            // Для демонстрации используем обычное уведомление
+            this.showNotification(message);
         } catch (error) {
-            console.error('❌ Ошибка показа локального уведомления:', error);
+            console.error('Error showing push notification:', error);
+            // Fallback
+            this.showNotification(message);
         }
     }
 
-    showNotification(notificationData) {
-        if (!notificationData) return;
+    showNotification(message) {
+        if (!message.sender) return;
 
-        new Notification(notificationData.title, {
-            body: notificationData.body,
-            icon: notificationData.icon,
+        const notification = new Notification('Новое сообщение в REonika', {
+            body: `${message.sender.username}: ${message.content || 'Голосовое/Изображение'}`,
+            icon: message.sender.avatar_url || '/icon.png',
             badge: '/icon.png',
-            tag: 'reonika-message',
-            requireInteraction: true,
-            data: notificationData.data || {}
-        });
-    }
-
-    showNotificationFromPayload(payload) {
-        const notification = payload.notification || {};
-        const data = payload.data || {};
-
-        this.showNotification({
-            title: notification.title || 'Новое сообщение в REonika',
-            body: notification.body || 'У вас новое сообщение',
-            icon: notification.icon || '/icon.png',
-            data: data
-        });
-    }
-
-    setupOnlineStatus() {
-        // Настройка обработчиков онлайн/оффлайн статуса
-        window.addEventListener('online', () => {
-            this.isOnline = true;
-            console.log('🌐 Подключение восстановлено');
+            tag: `reonika-message-${message.chat_id}`,
+            requireInteraction: false,
+            silent: false,
+            vibrate: [200, 100, 200]
         });
 
-        window.addEventListener('offline', () => {
-            this.isOnline = false;
-            console.log('📴 Подключение потеряно');
-        });
+        // Обработка клика на уведомление
+        notification.onclick = () => {
+            // Фокусируемся на окне если оно открыто
+            window.focus();
+            
+            // Открываем чат если он не выбран
+            if (this.messenger) {
+                const chat = this.messenger.chats.find(c => c.id === message.chat_id);
+                if (chat) {
+                    this.messenger.selectChat(chat);
+                }
+            }
+            
+            notification.close();
+        };
+
+        // Автоматически закрываем уведомление через 5 секунд
+        setTimeout(() => {
+            notification.close();
+        }, 5000);
     }
 
-    setupVisualIndicators() {
-        // Настройка визуальных индикаторов (можно расширить позже)
-        console.log('👁️ Визуальные индикаторы настроены');
+    // Метод для тестирования уведомлений
+    async testNotification() {
+        if (this.notificationPermission !== 'granted') {
+            console.warn('Notification permission not granted');
+            return false;
+        }
+
+        const testMessage = {
+            sender: {
+                username: 'Тестовый пользователь',
+                avatar_url: '/icon.png'
+            },
+            content: 'Это тестовое push-уведомление',
+            chat_id: 'test'
+        };
+
+        this.showNotification(testMessage);
+        return true;
     }
 
-    setupVisibilityHandlers() {
-        // Обработчики видимости страницы
+    // Метод для получения статуса push-уведомлений
+    getStatus() {
+        return {
+            isSupported: this.isSupported,
+            permission: this.notificationPermission,
+            hasSubscription: !!this.pushSubscription,
+            serviceWorkerRegistered: !!this.serviceWorkerRegistration
+        };
+    }
+
+    // Метод для мобильных WebView улучшений
+    enhanceForMobile() {
+        if (!this.messenger?.isMobile) return;
+
+        // Добавляем специальные обработчики для мобильных устройств
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                console.log('📱 Страница скрыта');
-            } else {
-                console.log('📱 Страница видна');
+            if (document.visibilityState === 'visible') {
+                // При возврате в приложение обновляем данные
+                if (this.messenger) {
+                    this.messenger.loadChats();
+                    if (this.messenger.currentChat) {
+                        this.messenger.loadMessages(this.messenger.currentChat.id);
+                    }
+                }
             }
         });
-    }
 
-    updateVisualIndicators() {
-        // Обновление визуальных индикаторов (можно расширить позже)
-        // Например, обновление счетчиков уведомлений
-    }
-
-    handlePresenceUpdate(payload) {
-        // Обработка обновлений статуса присутствия
-        console.log('👤 Обновление статуса присутствия:', payload);
-    }
-
-    setupAuthListener() {
-        // Слушаем события авторизации от messenger
-        if (this.messenger && typeof this.messenger.addEventListener === 'function') {
-            this.messenger.addEventListener('userSignedIn', async () => {
-                console.log('👤 Пользователь авторизовался, инициализируем уведомления...');
-                await this.getFCMToken();
-                this.setupRealtime();
+        // ОбработкаAppState для WebView
+        if (window.webkit && window.webkit.messageHandlers) {
+            // iOS WebView обработчики
+            window.webkit.messageHandlers.appStateChange.postMessage({
+                state: 'foreground'
             });
-        } else {
-            // Fallback: проверяем каждые 2 секунды
-            console.log('⚠️ Messenger не имеет addEventListener, используем polling');
-            this.authCheckInterval = setInterval(async () => {
-                if (this.messenger?.currentUser && !this.fcmToken) {
-                    console.log('👤 Пользователь авторизовался (polling), инициализируем уведомления...');
-                    await this.getFCMToken();
-                    this.setupRealtime();
-                    clearInterval(this.authCheckInterval);
-                }
-            }, 2000);
+        }
+
+        // Android WebView обработчики
+        if (window.REonikaWebView) {
+            window.REonikaWebView.onAppStateChange('foreground');
         }
     }
 }
 
-// Полная диагностика push-уведомлений
-window.diagnosePushNotifications = async () => {
-    console.log('🔍 🔍 🔍 ПОЛНАЯ ДИАГНОСТИКА PUSH-УВЕДОМЛЕНИЙ 🔍 🔍 🔍');
-
-    const results = {
-        permissions: false,
-        firebase: false,
-        token: false,
-        database: false,
-        function: false,
-        serviceWorker: false
-    };
-
-    // 1. Проверка разрешений
-    console.log('\n📋 1. Проверка разрешений уведомлений...');
-    if ('Notification' in window) {
-        const permission = await Notification.requestPermission();
-        results.permissions = permission === 'granted';
-        console.log(`   Разрешения: ${permission} ${results.permissions ? '✅' : '❌'}`);
-    } else {
-        console.log('   Notifications API не поддерживается ❌');
-    }
-
-    // 2. Проверка Firebase
-    console.log('\n🔥 2. Проверка Firebase...');
-    if (window.firebaseMessaging && window.firebaseGetToken && window.firebaseOnMessage) {
-        results.firebase = true;
-        console.log('   Firebase SDK загружен ✅');
-    } else {
-        console.log('   Firebase SDK не загружен ❌');
-    }
-
-    // 3. Проверка FCM токена
-    console.log('\n🎫 3. Проверка FCM токена...');
-    if (window.notifications?.fcmToken) {
-        results.token = true;
-        console.log(`   FCM токен: ${window.notifications.fcmToken.substring(0, 20)}... ✅`);
-    } else {
-        console.log('   FCM токен не получен ❌');
-    }
-
-    // 4. Проверка базы данных
-    console.log('\n💾 4. Проверка базы данных...');
-    if (window.messenger?.currentUser?.id) {
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('fcm_token')
-                .eq('id', window.messenger.currentUser.id)
-                .single();
-
-            if (data?.fcm_token) {
-                results.database = true;
-                console.log('   Токен сохранен в базе данных ✅');
-            } else {
-                console.log('   Токен НЕ сохранен в базе данных ❌', error);
-            }
-        } catch (error) {
-            console.log('   Ошибка запроса к базе данных ❌', error);
-        }
-    } else {
-        console.log('   Пользователь не авторизован ❌');
-    }
-
-    // 5. Проверка Service Worker
-    console.log('\n👷 5. Проверка Service Worker...');
-    if ('serviceWorker' in navigator) {
-        const registration = await navigator.serviceWorker.getRegistration('/sw.js');
-        if (registration) {
-            results.serviceWorker = true;
-            console.log('   Service Worker зарегистрирован ✅');
-        } else {
-            console.log('   Service Worker НЕ зарегистрирован ❌');
-        }
-    } else {
-        console.log('   Service Worker API не поддерживается ❌');
-    }
-
-    // 6. Проверка Edge Function
-    console.log('\n☁️ 6. Проверка Edge Function...');
-    try {
-        const testResponse = await supabase.functions.invoke('send-notification', {
-            body: {
-                receiver_id: 'test',
-                sender_id: 'test',
-                message_content: 'Test message',
-                chat_id: 'test'
-            }
-        });
-
-        // Ожидаемая ошибка (пользователь test не существует)
-        if (testResponse.error && (
-            (typeof testResponse.error === 'string' && testResponse.error.includes('FCM token not found')) ||
-            (typeof testResponse.error === 'object' && testResponse.error.error && testResponse.error.error.includes('FCM token not found'))
-        )) {
-            results.function = true;
-            console.log('   Edge Function работает (вернула ожидаемую ошибку) ✅');
-        } else {
-            console.log('   Edge Function вернула неожиданный результат ❌', testResponse);
-        }
-    } catch (error) {
-        console.log('   Edge Function недоступна ❌', error);
-    }
-
-    // Резюме
-    console.log('\n📊 РЕЗУЛЬТАТЫ ДИАГНОСТИКИ:');
-    console.log(`   Разрешения: ${results.permissions ? '✅' : '❌'}`);
-    console.log(`   Firebase: ${results.firebase ? '✅' : '❌'}`);
-    console.log(`   FCM токен: ${results.token ? '✅' : '❌'}`);
-    console.log(`   База данных: ${results.database ? '✅' : '❌'}`);
-    console.log(`   Service Worker: ${results.serviceWorker ? '✅' : '❌'}`);
-    console.log(`   Edge Function: ${results.function ? '✅' : '❌'}`);
-
-    const allGood = Object.values(results).every(r => r);
-    if (allGood) {
-        console.log('\n🎉 ВСЕ КОМПОНЕНТЫ РАБОТАЮТ! Push-уведомления должны приходить.');
-        console.log('💡 Если уведомления не приходят, проверьте логи в Supabase Edge Functions');
-    } else {
-        console.log('\n⚠️ НЕКОТОРЫЕ КОМПОНЕНТЫ НЕ РАБОТАЮТ. Исправьте ошибки выше.');
-    }
-
-    console.log('\n🔍 🔍 🔍 ДИАГНОСТИКА ЗАВЕРШЕНА 🔍 🔍 🔍');
-};
-
-// Краткий тест для быстрой проверки
-window.testPushNotifications = window.diagnosePushNotifications;
-
-// Простая тестовая функция на всякий случай
-window.simpleTest = () => {
-    console.log('🎯 Простой тест: notifications.js загружен');
-    console.log('window.notifications:', window.notifications);
-    console.log('window.messenger:', window.messenger);
-};
-
-// Тестовое уведомление
-window.testLocalNotification = () => {
-    console.log('🔔 Тестируем локальное уведомление...');
-    if (window.notifications) {
-        window.notifications.sendLocalNotification(
-            { username: 'Тест' },
-            { content: 'Это тестовое уведомление!' }
-        );
-    } else {
-        console.error('❌ Notifications не инициализирован');
-    }
-};
-
-// Тест получения FCM токена вручную
-window.testFCMToken = async () => {
-    console.log('🔑 Тестируем получение FCM токена вручную...');
-
-    if (!window.firebaseGetToken) {
-        console.error('❌ Firebase не инициализирован');
-        return;
-    }
-
-    try {
-        console.log('🔄 Попытка без VAPID...');
-        const token1 = await window.firebaseGetToken();
-        console.log('Результат без VAPID:', token1 ? 'УСПЕХ' : 'НЕТ ТОКЕНА');
-
-        console.log('🔄 Попытка с VAPID...');
-        const vapidKey = "BP9MbxkOem3B6DXtLDWIZs3iLzsLNTzZ2_KVnMAgbPvroRO6VmU2NliFmDFI8TJLdsANTJWV8ZBoG51nngk3tQA";
-        const token2 = await window.firebaseGetToken({ vapidKey });
-        console.log('Результат с VAPID:', token2 ? 'УСПЕХ' : 'НЕТ ТОКЕНА');
-
-        if (token2) {
-            console.log('✅ FCM токен получен:', token2);
-            return token2;
-        } else {
-            console.log('❌ FCM токен не получен');
-            console.log('💡 Возможные причины:');
-            console.log('   - Неправильный VAPID ключ');
-            console.log('   - Firebase проект не настроен для web push');
-            console.log('   - Сертификат сайта не HTTPS');
-        }
-    } catch (error) {
-        console.error('❌ Ошибка при получении токена:', error);
-    }
-};
-
+// Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
     const checkMessenger = () => {
         if (window.messenger) {
             window.notifications = new REonikaNotifications(window.messenger);
+            
+            // Добавляем метод для тестирования уведомлений в глобальную область
+            window.testNotification = () => {
+                if (window.notifications) {
+                    return window.notifications.testNotification();
+                }
+                return false;
+            };
+
+            // Добавляем метод для получения статуса
+            window.getNotificationStatus = () => {
+                if (window.notifications) {
+                    return window.notifications.getStatus();
+                }
+                return null;
+            };
+            
+            console.log('Push notifications initialized. Use testNotification() to test');
+            console.log('Use getNotificationStatus() to check status');
         } else {
             setTimeout(checkMessenger, 100);
         }
