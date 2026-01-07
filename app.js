@@ -189,7 +189,7 @@ class REonikaMessenger {
 
             // Request permissions at startup
             setTimeout(() => {
-                this.requestStartupPermissions();
+                this.requestStartupPermissionsEnhanced();
             }, 1000);
             
             this.updateUserUI();
@@ -2968,13 +2968,36 @@ class REonikaMessenger {
         }, 3000);
     }
 
-    async requestStartupPermissions() {
-        if (window.permissionManager && window.permissionManager.requestEssentialPermissions) {
+    async requestStartupPermissionsEnhanced() {
+        if (window.permissionManager && window.permissionManager.requestNotificationPermissionEnhanced) {
             try {
-                const results = await window.permissionManager.requestEssentialPermissions();
-                console.log('Startup permissions requested:', results);
+                // Запрашиваем уведомления с улучшенным интерфейсом
+                const notificationResult = await window.permissionManager.requestNotificationPermissionEnhanced();
+                console.log('Enhanced notification permission requested:', notificationResult);
+                
+                // Запрашиваем микрофон
+                const microphoneResult = await window.permissionManager.requestMicrophonePermission();
+                console.log('Microphone permission requested:', microphoneResult);
+                
+                // Показываем статус уведомлений
+                setTimeout(() => {
+                    if (window.notifications) {
+                        const status = window.notifications.getStatus();
+                        console.log('Notification system status:', status);
+                        
+                        if (!status.supported) {
+                            this.showNotification('Push-уведомления не поддерживаются вашим браузером', 'warning');
+                        } else if (status.permission === 'denied') {
+                            window.permissionManager.showPermissionGuide('notifications', this.isMobile);
+                        } else if (status.permission === 'granted') {
+                            this.showNotification('Уведомления успешно включены!', 'success');
+                        }
+                    }
+                }, 2000);
+                
             } catch (error) {
-                console.error('Error requesting startup permissions:', error);
+                console.error('Error requesting enhanced startup permissions:', error);
+                this.showNotification('Ошибка настройки уведомлений', 'error');
             }
         }
     }

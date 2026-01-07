@@ -252,6 +252,32 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Регистрация Service Worker для push-уведомлений
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker зарегистрирован:', registration);
+                        
+                        // Проверяем наличие обновлений
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            if (newWorker) {
+                                newWorker.addEventListener('statechange', () => {
+                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        // Показываем уведомление об обновлении
+                                        if (window.messenger) {
+                                            window.messenger.showNotification('Доступно обновление приложения', 'info');
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('Ошибка регистрации Service Worker:', error);
+                    });
+            }
+
             if (!window.indexedDB) {
                 alert('Ваш браузер не поддерживает IndexedDB. Некоторые функции могут работать некорректно.');
             }
@@ -312,6 +338,33 @@
                     }
                 });
             });
+
+            // Обработка сообщений от Service Worker для открытия чатов
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.addEventListener('message', (event) => {
+                    if (event.data && event.data.type === 'open_chat') {
+                        const { chatId, senderId } = event.data;
+                        
+                        // Открываем чат после загрузки приложения
+                        setTimeout(() => {
+                            if (window.messenger && window.messenger.chats) {
+                                const chat = window.messenger.chats.find(c => c.id === chatId);
+                                if (chat) {
+                                    window.messenger.selectChat(chat);
+                                } else {
+                                    // Если чат не найден, перезагружаем список
+                                    window.messenger.loadChats().then(() => {
+                                        const reloadedChat = window.messenger.chats.find(c => c.id === chatId);
+                                        if (reloadedChat) {
+                                            window.messenger.selectChat(reloadedChat);
+                                        }
+                                    });
+                                }
+                            }
+                        }, 1000);
+                    }
+                });
+            }
 
             console.log('Приложение инициализировано. Мобильная поддержка:', isMobile);
         });

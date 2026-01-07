@@ -1,259 +1,155 @@
-// notifications.js - Улучшенная версия с поддержкой Push API и Service Worker
+// notifications.js - улучшенная система push-уведомлений
 class REonikaNotifications {
     constructor(messenger) {
         this.messenger = messenger;
         this.notificationPermission = 'default';
         this.pushSubscription = null;
         this.isSupported = this.checkSupport();
-        this.serviceWorkerRegistration = null;
         this.init();
     }
 
     checkSupport() {
-        const supported = {
-            notifications: 'Notification' in window,
-            push: 'PushManager' in window,
-            serviceWorker: 'serviceWorker' in navigator,
-            vapid: true // VAPID ключи будут добавлены
-        };
-
-        console.log('Notification support:', supported);
-        return supported.notifications && supported.push && supported.serviceWorker;
+        const hasServiceWorker = 'serviceWorker' in navigator;
+        const hasPushManager = 'PushManager' in window;
+        const hasNotification = 'Notification' in window;
+        
+        console.log('Поддержка уведомлений:', {
+            serviceWorker: hasServiceWorker,
+            pushManager: hasPushManager,
+            notification: hasNotification
+        });
+        
+        return hasServiceWorker && hasPushManager && hasNotification;
     }
 
     async init() {
         if (!this.isSupported) {
-            console.warn('Push notifications не поддерживаются в этом браузере');
-            // Используем fallback на обычные уведомления
-            await this.initFallbackNotifications();
+            console.warn('Push-уведомления не поддерживаются в этом браузере');
+            await this.initBasicNotifications();
             return;
         }
 
         try {
-            // Регистрируем Service Worker
+            // Регистрация Service Worker
             await this.registerServiceWorker();
             
-            // Запрашиваем разрешения
+            // Запрос разрешений
             await this.requestPermissions();
             
-            // Настраиваем подписку на push
+            // Настройка push-подписки
             await this.setupPushSubscription();
             
-            // Настраиваем realtime
+            // Настройка real-time подписок
             this.setupRealtime();
             
-            console.log('Push notifications initialized successfully');
+            // Обработка сообщений от Service Worker
+            this.setupMessageListener();
+            
         } catch (error) {
-            console.error('Error initializing push notifications:', error);
-            // Fallback на обычные уведомления
-            await this.initFallbackNotifications();
+            console.error('Ошибка инициализации уведомлений:', error);
+            await this.initBasicNotifications();
         }
-    }
-
-    async initFallbackNotifications() {
-        // Используем менеджер разрешений вместо прямого запроса
-        if (window.permissionManager) {
-            const result = await window.permissionManager.requestSpecificPermission('notifications');
-            this.notificationPermission = result.permission;
-        } else {
-            // Fallback если менеджер разрешений не загружен
-            await this.requestPermission();
-        }
-        this.setupRealtime();
     }
 
     async registerServiceWorker() {
-        try {
-            // Создаем Service Worker "на лету"
-            const swUrl = this.createServiceWorker();
-            const blob = new Blob([swUrl], { type: 'application/javascript' });
-            const swUrlObject = URL.createObjectURL(blob);
-            
-            this.serviceWorkerRegistration = await navigator.serviceWorker.register(swUrlObject);
-            console.log('Service Worker registered successfully');
-            
-            // Очищаем URL после регистрации
-            setTimeout(() => URL.revokeObjectURL(swUrlObject), 1000);
-            
-            return this.serviceWorkerRegistration;
-        } catch (error) {
-            console.error('Service Worker registration failed:', error);
-            throw error;
-        }
-    }
-
-    createServiceWorker() {
-        return `
-            // Service Worker для REonika Push Notifications
-            const CACHE_NAME = 'reonika-push-v1';
-            
-            self.addEventListener('install', (event) => {
-                console.log('Service Worker installing...');
-                self.skipWaiting();
-            });
-            
-            self.addEventListener('activate', (event) => {
-                console.log('Service Worker activating...');
-                event.waitUntil(self.clients.claim());
-            });
-            
-            self.addEventListener('push', (event) => {
-                console.log('Push message received:', event);
+        if ('serviceWorker' in navigator) {
+            try {
+                const registration = await navigator.serviceWorker.register('/sw.js', {
+                    scope: '/'
+                });
                 
-                if (!event.data) {
-                    console.log('Push event has no data');
-                    return;
-                }
+                console.log('Service Worker зарегистрирован:', registration.scope);
                 
-                try {
-                    const data = event.data.json();
-                    console.log('Push data:', data);
-                    
-                    const title = data.title || 'REonika';
-                    const options = {
-                        body: data.body || 'Новое сообщение',
-                        icon: data.icon || '/icon.png',
-                        badge: '/icon.png',
-                        tag: data.tag || 'reonika-message',
-                        data: data.data || {},
-                        requireInteraction: false,
-                        silent: false,
-                        vibrate: [200, 100, 200],
-                        actions: [
-                            {
-                                action: 'open',
-                                title: 'Открыть'
-                            },
-                            {
-                                action: 'dismiss',
-                                title: 'Закрыть'
+                // Ожидаем активации
+                if (registration.active) {
+                    console.log('Service Worker уже активен');
+                } else {
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'activated') {
+                                console.log('Service Worker активирован');
                             }
-                        ]
-                    };
-                    
-                    event.waitUntil(
-                        self.registration.showNotification(title, options)
-                    );
-                } catch (error) {
-                    console.error('Error processing push message:', error);
-                }
-            });
-            
-            self.addEventListener('notificationclick', (event) => {
-                console.log('Notification clicked:', event);
-                
-                event.notification.close();
-                
-                if (event.action === 'dismiss') {
-                    return;
+                        });
+                    });
                 }
                 
-                const urlToOpen = event.notification.data?.url || '/';
-                
-                event.waitUntil(
-                    clients.matchAll({ type: 'window' }).then((clientList) => {
-                        for (const client of clientList) {
-                            if (client.url === urlToOpen && 'focus' in client) {
-                                return client.focus();
-                            }
-                        }
-                        
-                        if (clients.openWindow) {
-                            return clients.openWindow(urlToOpen);
-                        }
-                    })
-                );
-            });
-            
-            self.addEventListener('pushsubscriptionchange', (event) => {
-                console.log('Push subscription changed');
-                event.waitUntil(
-                    self.registration.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: urlB64ToUint8Array('BLbVQ7nJz8o5h9K1nGz2X4f6Y8p0r2t4w6x8z0c2v4b6n8m0q2s4u6w8y0z2a4')
-                    })
-                    .then((subscription) => {
-                        console.log('New subscription:', subscription);
-                        // Здесь можно отправить новую подписку на сервер
-                    })
-                );
-            });
-            
-            // Вспомогательная функция для конвертации VAPID ключа
-            function urlB64ToUint8Array(base64String) {
-                const padding = '='.repeat((4 - base64String.length % 4) % 4);
-                const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-                const rawData = window.atob(base64);
-                const outputArray = new Uint8Array(rawData.length);
-                
-                for (let i = 0; i < rawData.length; ++i) {
-                    outputArray[i] = rawData.charCodeAt(i);
-                }
-                return outputArray;
+                return registration;
+            } catch (error) {
+                console.error('Ошибка регистрации Service Worker:', error);
+                throw error;
             }
-        `;
+        }
+        throw new Error('Service Worker не поддерживается');
     }
 
     async requestPermissions() {
-        try {
-            // Запрашиваем разрешение на уведомления
+        // Используем менеджер разрешений если доступен
+        if (window.permissionManager) {
+            const result = await window.permissionManager.requestNotificationPermission();
+            this.notificationPermission = result.permission;
+        } else {
+            // Запрашиваем разрешения напрямую
             this.notificationPermission = await Notification.requestPermission();
-            
-            if (this.notificationPermission !== 'granted') {
-                throw new Error('Notification permission denied');
-            }
-            
-            console.log('Notification permission granted');
-        } catch (error) {
-            console.error('Error requesting notification permission:', error);
-            throw error;
         }
+        
+        console.log('Разрешение на уведомления:', this.notificationPermission);
+        
+        if (this.notificationPermission !== 'granted') {
+            throw new Error('Разрешение на уведомления не получено');
+        }
+        
+        return this.notificationPermission;
     }
 
     async setupPushSubscription() {
-        if (!this.serviceWorkerRegistration) {
-            throw new Error('Service Worker not registered');
+        if (!this.isSupported || this.notificationPermission !== 'granted') {
+            return;
         }
 
         try {
+            const registration = await navigator.serviceWorker.ready;
+            
             // Проверяем существующую подписку
-            let subscription = await this.serviceWorkerRegistration.pushManager.getSubscription();
+            let subscription = await registration.pushManager.getSubscription();
             
             if (!subscription) {
                 // Создаем новую подписку
-                // Используем генерированный VAPID ключ для демонстрации
-                // В реальном приложении нужно использовать реальные ключи
-                const applicationServerKey = this.urlB64ToUint8Array(
-                    'BLbVQ7nJz8o5h9K1nGz2X4f6Y8p0r2t4w6x8z0c2v4b6n8m0q2s4u6w8y0z2a4'
-                );
-                
-                subscription = await this.serviceWorkerRegistration.pushManager.subscribe({
+                const vapidPublicKey = await this.getVapidPublicKey();
+                subscription = await registration.pushManager.subscribe({
                     userVisibleOnly: true,
-                    applicationServerKey: applicationServerKey
+                    applicationServerKey: this.urlBase64ToUint8Array(vapidPublicKey)
                 });
-                
-                console.log('New push subscription created:', subscription);
-                
-                // Сохраняем подписку в базе данных
-                await this.savePushSubscription(subscription);
-            } else {
-                console.log('Existing push subscription found:', subscription);
             }
             
             this.pushSubscription = subscription;
-            return subscription;
+            
+            // Сохраняем подписку в Supabase
+            await this.savePushSubscription(subscription);
+            
+            console.log('Push-подписка настроена успешно');
+            
         } catch (error) {
-            console.error('Error setting up push subscription:', error);
+            console.error('Ошибка настройки push-подписки:', error);
             throw error;
         }
     }
 
-    urlB64ToUint8Array(base64String) {
+    async getVapidPublicKey() {
+        // VAPID ключи для Supabase Edge Functions
+        // В реальном приложении эти ключи должны быть на сервере
+        return 'BMzFTk3Lh8l7e6vD9jJnGnJYcXkMvLzRzCfQdWqEeT7UfN3mKpB8sVg5tYwLqNxHqJrZyPpStUwVqEeT7UfN3mKpB8sVg5tYwLqNxHqJrZyP';
+    }
+
+    urlBase64ToUint8Array(base64String) {
         const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-        const rawData = atob(base64);
+        const base64 = (base64String + padding)
+            .replace(/-/g, '+')
+            .replace(/_/g, '/');
+
+        const rawData = window.atob(base64);
         const outputArray = new Uint8Array(rawData.length);
-        
+
         for (let i = 0; i < rawData.length; ++i) {
             outputArray[i] = rawData.charCodeAt(i);
         }
@@ -261,46 +157,34 @@ class REonikaNotifications {
     }
 
     async savePushSubscription(subscription) {
-        if (!this.messenger?.currentUser) {
-            console.warn('Cannot save push subscription: no current user');
-            return;
-        }
+        if (!this.messenger?.currentUser?.id) return;
 
         try {
-            const subscriptionData = {
-                user_id: this.messenger.currentUser.id,
-                endpoint: subscription.endpoint,
-                p256dh_key: subscription.getKey('p256dh') ? 
-                    btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')))) : null,
-                auth_key: subscription.getKey('auth') ? 
-                    btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')))) : null,
-                created_at: new Date().toISOString(),
-                user_agent: navigator.userAgent,
-                is_active: true
-            };
-
-            // Сохраняем в Supabase
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('push_subscriptions')
-                .upsert(subscriptionData, {
-                    onConflict: 'user_id,endpoint'
-                });
+                .upsert({
+                    user_id: this.messenger.currentUser.id,
+                    endpoint: subscription.endpoint,
+                    p256dh_key: subscription.toJSON().keys.p256dh,
+                    auth_key: subscription.toJSON().keys.auth,
+                    user_agent: navigator.userAgent,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .select()
+                .single();
 
             if (error) {
-                console.error('Error saving push subscription:', error);
+                console.error('Ошибка сохранения push-подписки:', error);
                 throw error;
             }
 
-            console.log('Push subscription saved successfully');
+            console.log('Push-подписка сохранена:', data);
+            
         } catch (error) {
-            console.error('Error saving push subscription:', error);
-            // Не выбрасываем ошибку, чтобы не прерывать инициализацию
+            console.error('Ошибка сохранения push-подписки:', error);
+            throw error;
         }
-    }
-
-    async requestPermission() {
-        if (!('Notification' in window)) return;
-        this.notificationPermission = await Notification.requestPermission();
     }
 
     setupRealtime() {
@@ -309,7 +193,7 @@ class REonikaNotifications {
         const userId = this.messenger.currentUser?.id;
         if (!userId) return;
 
-        // Подписка на новые сообщения в чатах пользователя
+        // Подписка на новые сообщения
         const subscription = supabase
             .channel('new-messages')
             .on('postgres_changes', {
@@ -319,34 +203,19 @@ class REonikaNotifications {
             }, async (payload) => {
                 const message = payload.new;
 
-                // Проверяем, что сообщение в чате пользователя и не от самого пользователя
+                // Проверяем, что сообщение не от текущего пользователя
                 if (message.sender_id === userId) return;
 
+                // Проверяем, что это чат пользователя
                 const isUserChat = this.messenger.chats.some(chat => chat.id === message.chat_id);
                 if (!isUserChat) return;
 
-                // Показываем уведомление если страница не активна
-                if (this.notificationPermission === 'granted' &&
-                    (document.visibilityState === 'hidden' || !document.hasFocus())) {
-                    
-                    // Получаем данные отправителя
-                    const { data: sender } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', message.sender_id)
-                        .single();
-
-                    if (sender) {
-                        const notificationMessage = { ...message, sender };
-                        
-                        // Показываем push уведомление если доступно
-                        if (this.isSupported && this.pushSubscription) {
-                            await this.showPushNotification(notificationMessage);
-                        } else {
-                            // Fallback на обычное уведомление
-                            this.showNotification(notificationMessage);
-                        }
-                    }
+                // Отправляем push-уведомление через Supabase Edge Function
+                await this.sendPushNotification(message);
+                
+                // Показываем локальное уведомление если вкладка неактивна
+                if (document.visibilityState === 'hidden') {
+                    await this.showLocalNotification(message);
                 }
             })
             .subscribe();
@@ -354,144 +223,274 @@ class REonikaNotifications {
         this.messenger.realtimeSubscriptions.push(subscription);
     }
 
-    async showPushNotification(message) {
-        if (!message.sender) return;
-
+    async sendPushNotification(message) {
         try {
-            // Отправляем push через сервис (можно использовать вебсокеты или другой сервис)
-            // Для демонстрации используем обычное уведомление
-            this.showNotification(message);
-        } catch (error) {
-            console.error('Error showing push notification:', error);
-            // Fallback
-            this.showNotification(message);
-        }
-    }
+            // Получаем данные отправителя
+            const { data: sender } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', message.sender_id)
+                .single();
 
-    showNotification(message) {
-        if (!message.sender) return;
+            if (!sender) return;
 
-        const notification = new Notification('Новое сообщение в REonika', {
-            body: `${message.sender.username}: ${message.content || 'Голосовое/Изображение'}`,
-            icon: message.sender.avatar_url || '/icon.png',
-            badge: '/icon.png',
-            tag: `reonika-message-${message.chat_id}`,
-            requireInteraction: false,
-            silent: false,
-            vibrate: [200, 100, 200]
-        });
+            // Получаем все push-подписки получателя
+            const { data: subscriptions } = await supabase
+                .from('push_subscriptions')
+                .select('*')
+                .eq('user_id', this.messenger.currentUser.id);
 
-        // Обработка клика на уведомление
-        notification.onclick = () => {
-            // Фокусируемся на окне если оно открыто
-            window.focus();
-            
-            // Открываем чат если он не выбран
-            if (this.messenger) {
-                const chat = this.messenger.chats.find(c => c.id === message.chat_id);
-                if (chat) {
-                    this.messenger.selectChat(chat);
+            if (!subscriptions || subscriptions.length === 0) {
+                console.log('Нет push-подписок для пользователя');
+                return;
+            }
+
+            // Отправляем push-уведомления через Supabase Edge Function
+            for (const subscription of subscriptions) {
+                try {
+                    const response = await supabase.functions.invoke('send-push-notification', {
+                        body: {
+                            subscription: {
+                                endpoint: subscription.endpoint,
+                                keys: {
+                                    p256dh: subscription.p256dh_key,
+                                    auth: subscription.auth_key
+                                }
+                            },
+                            notification: {
+                                title: `Новое сообщение от ${sender.username}`,
+                                body: message.content || 'Голосовое сообщение или изображение',
+                                icon: sender.avatar_url || '/icon.png',
+                                badge: '/icon.png',
+                                tag: `chat-${message.chat_id}`,
+                                data: {
+                                    chatId: message.chat_id,
+                                    senderId: message.sender_id,
+                                    messageId: message.id
+                                },
+                                actions: [
+                                    {
+                                        action: 'open',
+                                        title: 'Открыть чат'
+                                    }
+                                ]
+                            }
+                        }
+                    });
+
+                    if (response.error) {
+                        console.error('Ошибка отправки push-уведомления:', response.error);
+                    } else {
+                        console.log('Push-уведомление отправлено успешно');
+                    }
+                } catch (error) {
+                    console.error('Ошибка отправки push-уведомления для подписки:', error);
                 }
             }
-            
-            notification.close();
-        };
-
-        // Автоматически закрываем уведомление через 5 секунд
-        setTimeout(() => {
-            notification.close();
-        }, 5000);
-    }
-
-    // Метод для тестирования уведомлений
-    async testNotification() {
-        if (this.notificationPermission !== 'granted') {
-            console.warn('Notification permission not granted');
-            return false;
+        } catch (error) {
+            console.error('Ошибка в sendPushNotification:', error);
         }
-
-        const testMessage = {
-            sender: {
-                username: 'Тестовый пользователь',
-                avatar_url: '/icon.png'
-            },
-            content: 'Это тестовое push-уведомление',
-            chat_id: 'test'
-        };
-
-        this.showNotification(testMessage);
-        return true;
     }
 
-    // Метод для получения статуса push-уведомлений
-    getStatus() {
-        return {
-            isSupported: this.isSupported,
-            permission: this.notificationPermission,
-            hasSubscription: !!this.pushSubscription,
-            serviceWorkerRegistered: !!this.serviceWorkerRegistration
-        };
+    async showLocalNotification(message) {
+        if (this.notificationPermission !== 'granted') return;
+
+        try {
+            // Получаем данные отправителя
+            const { data: sender } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', message.sender_id)
+                .single();
+
+            if (!sender) return;
+
+            const title = `Новое сообщение от ${sender.username}`;
+            let body = 'Голосовое сообщение или изображение';
+            
+            if (message.content) {
+                body = message.content;
+            } else if (message.image_url) {
+                body = '📷 Изображение';
+            } else if (message.voice_url) {
+                body = '🎤 Голосовое сообщение';
+            }
+
+            const notification = new Notification(title, {
+                body: body,
+                icon: sender.avatar_url || '/icon.png',
+                badge: '/icon.png',
+                tag: `chat-${message.chat_id}`,
+                data: {
+                    chatId: message.chat_id,
+                    senderId: message.sender_id,
+                    messageId: message.id
+                },
+                requireInteraction: true,
+                silent: false
+            });
+
+            // Обработка клика по уведомлению
+            notification.onclick = () => {
+                notification.close();
+                
+                // Фокусируемся на окне
+                window.focus();
+                
+                // Открываем соответствующий чат
+                if (this.messenger && message.chat_id) {
+                    const chat = this.messenger.chats.find(c => c.id === message.chat_id);
+                    if (chat) {
+                        this.messenger.selectChat(chat);
+                    }
+                }
+            };
+
+        } catch (error) {
+            console.error('Ошибка показа локального уведомления:', error);
+        }
     }
 
-    // Метод для мобильных WebView улучшений
-    enhanceForMobile() {
-        if (!this.messenger?.isMobile) return;
-
-        // Добавляем специальные обработчики для мобильных устройств
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                // При возврате в приложение обновляем данные
+    setupMessageListener() {
+        // Обработка сообщений от Service Worker
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'open_chat') {
+                const { chatId, senderId } = event.data;
+                
                 if (this.messenger) {
-                    this.messenger.loadChats();
-                    if (this.messenger.currentChat) {
-                        this.messenger.loadMessages(this.messenger.currentChat.id);
+                    // Ищем чат в загруженных чатах
+                    const chat = this.messenger.chats.find(c => c.id === chatId);
+                    if (chat) {
+                        this.messenger.selectChat(chat);
+                    } else {
+                        // Если чат не найден, перезагружаем список чатов
+                        this.messenger.loadChats().then(() => {
+                            const reloadedChat = this.messenger.chats.find(c => c.id === chatId);
+                            if (reloadedChat) {
+                                this.messenger.selectChat(reloadedChat);
+                            }
+                        });
                     }
                 }
             }
         });
+    }
 
-        // ОбработкаAppState для WebView
-        if (window.webkit && window.webkit.messageHandlers) {
-            // iOS WebView обработчики
-            window.webkit.messageHandlers.appStateChange.postMessage({
-                state: 'foreground'
-            });
+    async initBasicNotifications() {
+        // Резервная система базовых уведомлений
+        if (window.permissionManager) {
+            const result = await window.permissionManager.requestNotificationPermission();
+            this.notificationPermission = result.permission;
+        } else {
+            this.notificationPermission = await Notification.requestPermission();
         }
+        
+        this.setupBasicRealtime();
+    }
 
-        // Android WebView обработчики
-        if (window.REonikaWebView) {
-            window.REonikaWebView.onAppStateChange('foreground');
+    setupBasicRealtime() {
+        if (!this.messenger) return;
+
+        const userId = this.messenger.currentUser?.id;
+        if (!userId) return;
+
+        const subscription = supabase
+            .channel('new-messages-basic')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages'
+            }, async (payload) => {
+                const message = payload.new;
+
+                if (message.sender_id === userId) return;
+
+                const isUserChat = this.messenger.chats.some(chat => chat.id === message.chat_id);
+                if (!isUserChat) return;
+
+                if (this.notificationPermission === 'granted' && 
+                    document.visibilityState === 'hidden') {
+                    await this.showBasicNotification(message);
+                }
+            })
+            .subscribe();
+
+        this.messenger.realtimeSubscriptions.push(subscription);
+    }
+
+    async showBasicNotification(message) {
+        try {
+            const { data: sender } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', message.sender_id)
+                .single();
+
+            if (!sender) return;
+
+            let body = 'Новое сообщение';
+            if (message.content) {
+                body = `${sender.username}: ${message.content}`;
+            } else if (message.image_url) {
+                body = `${sender.username}: 📷 Изображение`;
+            } else if (message.voice_url) {
+                body = `${sender.username}: 🎤 Голосовое сообщение`;
+            }
+
+            new Notification('REonika', {
+                body: body,
+                icon: sender.avatar_url || '/icon.png'
+            });
+        } catch (error) {
+            console.error('Ошибка базового уведомления:', error);
+        }
+    }
+
+    // Метод для проверки статуса уведомлений
+    getStatus() {
+        return {
+            supported: this.isSupported,
+            permission: this.notificationPermission,
+            pushSubscription: !!this.pushSubscription,
+            serviceWorkerReady: !!navigator.serviceWorker?.controller
+        };
+    }
+
+    // Метод для удаления push-подписки
+    async unsubscribeFromPush() {
+        if (!this.pushSubscription) return true;
+
+        try {
+            await this.pushSubscription.unsubscribe();
+            
+            // Удаляем из базы данных
+            if (this.messenger?.currentUser?.id) {
+                await supabase
+                    .from('push_subscriptions')
+                    .delete()
+                    .eq('user_id', this.messenger.currentUser.id);
+            }
+            
+            this.pushSubscription = null;
+            console.log('Отписка от push-уведомлений выполнена');
+            return true;
+        } catch (error) {
+            console.error('Ошибка отписки от push-уведомлений:', error);
+            return false;
         }
     }
 }
 
-// Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
     const checkMessenger = () => {
         if (window.messenger) {
             window.notifications = new REonikaNotifications(window.messenger);
-            
-            // Добавляем метод для тестирования уведомлений в глобальную область
-            window.testNotification = () => {
-                if (window.notifications) {
-                    return window.notifications.testNotification();
-                }
-                return false;
-            };
-
-            // Добавляем метод для получения статуса
-            window.getNotificationStatus = () => {
-                if (window.notifications) {
-                    return window.notifications.getStatus();
-                }
-                return null;
-            };
-            
-            console.log('Push notifications initialized. Use testNotification() to test');
-            console.log('Use getNotificationStatus() to check status');
+            console.log('Система уведомлений инициализирована');
         } else {
             setTimeout(checkMessenger, 100);
         }
     };
     setTimeout(checkMessenger, 1000);
 });
+
+export { REonikaNotifications };
